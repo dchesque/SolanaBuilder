@@ -1,0 +1,12 @@
+/* global-overrides.css */
+
+.wallet-adapter-button.wallet-adapter-button-trigger {
+  @apply py-3 px-6 rounded-md bg-gradient-to-r from-purple-500 to-pink-500
+         hover:from-purple-600 hover:to-pink-600 text-white font-bold
+         shadow-lg hover:shadow-xl transition;
+}
+
+/* Desaparece com o texto interno do adaptador */
+.wallet-adapter-button-text {
+  display: none !important;
+}

@@ -1,0 +1,22 @@
+# 🔹 Ignorar dependências do Node.js
+node_modules/
+
+# 🔹 Ignorar arquivos de cache
+.cache/
+npm-debug.log
+yarn-error.log
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# 🔹 Ignorar builds
+dist/
+build/
+
+# 🔹 Ignorar arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# 🔹 Ignorar env e credenciais
+.env
+.env.local
