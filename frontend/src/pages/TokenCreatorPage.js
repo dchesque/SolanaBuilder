@@ -1,4 +1,4 @@
-// Atualização de CreateTokenPage.js
+// TokenCreatorPage.jsx
 import { Link } from "react-router-dom";
 import { Coins } from "lucide-react";
 

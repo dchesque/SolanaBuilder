@@ -5,9 +5,7 @@ node_modules/
 .cache/
 npm-debug.log
 yarn-error.log
-package-lock.json
-pnpm-lock.yaml
-yarn.lock
+
 
 # 🔹 Ignorar builds
 dist/

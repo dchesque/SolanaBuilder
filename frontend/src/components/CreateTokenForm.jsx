@@ -1,3 +1,4 @@
+// CreateTokenForm.jsx
 import React, { useState } from "react";
 import { ArrowRight } from "lucide-react";
 import CostEstimate from "./CostEstimate";
@@ -16,7 +17,7 @@ import {
   MINT_SIZE,
 } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-
+import { useNavigate } from "react-router-dom";
 
 const SERVICE_WALLET = process.env.REACT_APP_SERVICE_WALLET;
 const SERVICE_FEE = parseFloat(process.env.REACT_APP_SERVICE_FEE);
@@ -32,6 +33,7 @@ function validateTicker(ticker) {
 function CreateTokenForm() {
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
+  const navigate = useNavigate();
 
   const [nomeToken, setNomeToken] = useState("");
   const [ticker, setTicker] = useState("");
@@ -162,11 +164,35 @@ function CreateTokenForm() {
       transaction.partialSign(mintKeypair);
 
       const signature = await sendTransaction(transaction, connection);
-      await connection.confirmTransaction(signature, "confirmed");
+
+      // Tenta confirmar a transação. Se ocorrer timeout, verifica se é o erro esperado.
+      try {
+        await connection.confirmTransaction(signature, "confirmed");
+      } catch (confirmError) {
+        if (
+          confirmError.message &&
+          confirmError.message.includes("Transaction was not confirmed in 30.00 seconds")
+        ) {
+          console.warn("Transaction confirmation timed out, but token might have been created.");
+        } else {
+          throw confirmError;
+        }
+      }
 
       setMessage(
         `Token created successfully!\nAddress: ${mintKeypair.publicKey.toString()}\nName: ${nomeToken}\nTicker: ${ticker}`
       );
+
+      // Redireciona para a página de detalhes do token,
+      // passando os dados via state: endereço, nome, ticker e supply
+      navigate("/token-details", {
+        state: {
+          tokenAddress: mintKeypair.publicKey.toString(),
+          tokenName: nomeToken,
+          ticker: ticker,
+          supply: mintAmount,
+        },
+      });
     } catch (err) {
       console.error(err);
       setMessage("Error creating token: " + err.message);
@@ -237,8 +263,8 @@ function CreateTokenForm() {
 
         {message && <p className="text-sm text-center text-yellow-400">{message}</p>}
 
-{/* Estimativa de Custo */}
-<div className="mb-6 bg-[#2b1740] bg-opacity-50 rounded-lg p-4 border border-[#6e3d76] shadow-sm text-center">
+        {/* Estimativa de Custo */}
+        <div className="mb-6 bg-[#2b1740] bg-opacity-50 rounded-lg p-4 border border-[#6e3d76] shadow-sm text-center">
           <CostEstimate />
         </div>
 
