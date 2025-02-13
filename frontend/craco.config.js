@@ -1,23 +1,20 @@
-// craco.config.js
-const path = require('path');
 const webpack = require('webpack');
+const NodePolyfillPlugin = require('node-polyfill-webpack-plugin');
 
 module.exports = {
   webpack: {
-    configure: (webpackConfig, { env, paths }) => {
-      // Desative a regra de fullySpecified para não exigir extensão em imports estritamente ESM
-      webpackConfig.resolve.fullySpecified = false;
+    configure: (webpackConfig) => {
+      // Substitui todos os imports de process/browser por process/browser.js
+      webpackConfig.module.rules.push({
+        test: /[\\/]node_modules[\\/].*axios[\\/].*\.js$/,
+        loader: 'string-replace-loader',
+        options: {
+          search: 'process/browser',
+          replace: 'process/browser.js',
+        },
+      });
 
-      // Exemplo de aliases
-      webpackConfig.resolve.alias = {
-        ...(webpackConfig.resolve.alias || {}),
-        '@': path.resolve(__dirname, 'src'),
-        '@components': path.resolve(__dirname, 'src/components'),
-        '@assets': path.resolve(__dirname, 'src/assets'),
-        '@utils': path.resolve(__dirname, 'src/utils'),
-      };
-
-      // Fallbacks para módulos Node.js que algumas dependências exigem
+      // Configurações de fallback
       webpackConfig.resolve.fallback = {
         ...webpackConfig.resolve.fallback,
         crypto: require.resolve('crypto-browserify'),
@@ -25,19 +22,31 @@ module.exports = {
         http: require.resolve('stream-http'),
         https: require.resolve('https-browserify'),
         zlib: require.resolve('browserify-zlib'),
-        buffer: require.resolve('buffer'),
-        process: require.resolve('process'),
+        url: require.resolve('url/'),
+        process: require.resolve('process/browser.js'),
+        buffer: require.resolve('buffer/')
       };
 
-      // Garante variáveis globais que muitos polyfills esperam
-      webpackConfig.plugins.push(
+      // Adiciona alias específico para o process/browser
+      webpackConfig.resolve.alias = {
+        ...webpackConfig.resolve.alias,
+        'process/browser': 'process/browser.js'
+      };
+
+      // Adiciona plugins
+      webpackConfig.plugins = [
+        ...webpackConfig.plugins,
         new webpack.ProvidePlugin({
-          process: 'process/browser',
-          Buffer: ['buffer', 'Buffer'],
+          process: 'process/browser.js',
+          Buffer: ['buffer', 'Buffer']
+        }),
+        new NodePolyfillPlugin(),
+        new webpack.DefinePlugin({
+          'process.env': JSON.stringify(process.env)
         })
-      );
+      ];
 
       return webpackConfig;
-    },
-  },
+    }
+  }
 };
