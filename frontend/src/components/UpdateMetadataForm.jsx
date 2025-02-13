@@ -21,9 +21,8 @@ const MAX_DESCRIPTION_LENGTH = 1000;
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000;
 const MAX_NAME_LENGTH = 32;
-const MAX_SYMBOL_LENGTH = 10;
 const MAX_URI_LENGTH = 200;
-
+const MAX_SYMBOL_LENGTH = 10;
 
 function UpdateMetadataForm() {
   const { connection } = useConnection();
@@ -51,8 +50,9 @@ function UpdateMetadataForm() {
     showPreview: false
   });
 
-// Função para comparar metadados
-const hasMetadataChanged = (currentMetadata, newMetadata) => {
+  // Função para comparar metadados
+  const hasMetadataChanged = (currentMetadata, newMetadata) => {
+    
     if (!currentMetadata) return true;
     
     return (
@@ -60,6 +60,40 @@ const hasMetadataChanged = (currentMetadata, newMetadata) => {
       currentMetadata.symbol !== newMetadata.symbol ||
       currentMetadata.uri !== newMetadata.uri
     );
+  };
+
+  const loadCurrentMetadata = async (mintAddress) => {
+    try {
+      const mintPubkey = new PublicKey(mintAddress);
+      const metaplex = new Metaplex(connection);
+      
+      const nft = await metaplex.nfts().findByMint({ mintAddress: mintPubkey });
+      if (nft) {
+        // Carregar os metadados JSON
+        const response = await fetch(nft.uri);
+        const metadata = await response.json();
+        
+        setFormData(prev => ({
+          ...prev,
+          name: nft.name || '',
+          symbol: nft.symbol || '',
+          description: metadata.description || '',
+          imageUrl: metadata.image || '',
+          website: metadata.external_url || metadata.links?.website || '',
+          twitter: metadata.links?.twitter || '',
+          telegram: metadata.links?.telegram || '',
+          github: metadata.links?.github || ''
+        }));
+  
+        setStatus(prev => ({
+          ...prev,
+          message: "Metadados atuais carregados.",
+          error: null
+        }));
+      }
+    } catch (error) {
+      console.log("Nenhum metadado encontrado ou erro ao carregar:", error);
+    }
   };
 
   // Parse URL query parameters
@@ -75,6 +109,13 @@ const hasMetadataChanged = (currentMetadata, newMetadata) => {
     }
   }, []);
 
+  // Carregar metadados quando o endereço do token mudar
+  useEffect(() => {
+    if (formData.mintAddress) {
+      loadCurrentMetadata(formData.mintAddress);
+    }
+  }, [formData.mintAddress]);
+
   // Image preview effect
   useEffect(() => {
     if (formData.imageUrl && validateUrl(formData.imageUrl)) {
@@ -89,23 +130,17 @@ const hasMetadataChanged = (currentMetadata, newMetadata) => {
     
     const { name, value } = e.target;
     
-      // Validar comprimentos máximos
-  switch (name) {
-    case 'name':
-      if (value.length > MAX_NAME_LENGTH) return;
-      break;
-    case 'symbol':
-      if (value.length > MAX_SYMBOL_LENGTH) return;
-      break;
-    case 'description':
-      if (value.length > MAX_DESCRIPTION_LENGTH) return;
-      break;
-  }
-  
-    
-    // Validate description length
-    if (name === 'description' && value.length > MAX_DESCRIPTION_LENGTH) {
-      return;
+    // Validar comprimentos máximos
+    switch (name) {
+      case 'name':
+        if (value.length > MAX_NAME_LENGTH) return;
+        break;
+      case 'symbol':
+        if (value.length > MAX_SYMBOL_LENGTH) return;
+        break;
+      case 'description':
+        if (value.length > MAX_DESCRIPTION_LENGTH) return;
+        break;
     }
     
     setFormData(prev => ({
@@ -264,8 +299,6 @@ const hasMetadataChanged = (currentMetadata, newMetadata) => {
     }
   };
 
-  // INICIO FORMA COMO CRIAMOS OS METADADOS
-  
   const handleUpdateMetadata = async (e) => {
     e.preventDefault();
 
@@ -279,36 +312,36 @@ const hasMetadataChanged = (currentMetadata, newMetadata) => {
       return;
     }
 
-       // Validar comprimentos
-       if (formData.name.length > MAX_NAME_LENGTH) {
-        setStatus({
-          ...status,
-          loading: false,
-          message: "",
-          error: `Nome muito longo. Máximo de ${MAX_NAME_LENGTH} caracteres.`
-        });
-        return;
-      }
-  
-      if (formData.symbol.length > MAX_SYMBOL_LENGTH) {
-        setStatus({
-          ...status,
-          loading: false,
-          message: "",
-          error: `Símbolo muito longo. Máximo de ${MAX_SYMBOL_LENGTH} caracteres.`
-        });
-        return;
-      }
-  
-      if (formData.description.length > MAX_DESCRIPTION_LENGTH) {
-        setStatus({
-          ...status,
-          loading: false,
-          message: "",
-          error: `Descrição muito longa. Máximo de ${MAX_DESCRIPTION_LENGTH} caracteres.`
-        });
-        return;
-      }
+    // Validar comprimentos
+    if (formData.name.length > MAX_NAME_LENGTH) {
+      setStatus({
+        ...status,
+        loading: false,
+        message: "",
+        error: `Nome muito longo. Máximo de ${MAX_NAME_LENGTH} caracteres.`
+      });
+      return;
+    }
+
+    if (formData.symbol.length > MAX_SYMBOL_LENGTH) {
+      setStatus({
+        ...status,
+        loading: false,
+        message: "",
+        error: `Símbolo muito longo. Máximo de ${MAX_SYMBOL_LENGTH} caracteres.`
+      });
+      return;
+    }
+
+    if (formData.description.length > MAX_DESCRIPTION_LENGTH) {
+      setStatus({
+        ...status,
+        loading: false,
+        message: "",
+        error: `Descrição muito longa. Máximo de ${MAX_DESCRIPTION_LENGTH} caracteres.`
+      });
+      return;
+    }
 
     // Validar o endereço do token
     let mintPubkey;
@@ -381,30 +414,6 @@ const hasMetadataChanged = (currentMetadata, newMetadata) => {
         }
       };
 
-      // Função de retry para operações
-      const executeWithRetry = async (operation, maxRetries = 3) => {
-        let lastError;
-        for (let attempt = 0; attempt < maxRetries; attempt++) {
-          try {
-            return await operation();
-          } catch (error) {
-            console.log(`Tentativa ${attempt + 1} falhou:`, error);
-            lastError = error;
-            
-            // Se o erro indicar que os metadados já existem, não tente novamente
-            if (error.message.includes('Expected account to be uninitialized') ||
-                error.message.includes('custom program error: 0xc7')) {
-              throw new Error('Metadados já existem. Tente atualizar em vez de criar.');
-            }
-            
-            if (attempt < maxRetries - 1) {
-              await new Promise(resolve => setTimeout(resolve, 2000));
-            }
-          }
-        }
-        throw lastError;
-      };
-
       let uploadedUri;
 
       try {
@@ -417,7 +426,7 @@ const hasMetadataChanged = (currentMetadata, newMetadata) => {
         });
 
         // Upload metadata to Arweave with retry
-        const { uri } = await executeWithRetry(async () => {
+        const { uri } = await retryOperation(async () => {
           return await metaplex.nfts().uploadMetadata(metadataJson);
         });
         uploadedUri = uri;
@@ -446,22 +455,47 @@ const hasMetadataChanged = (currentMetadata, newMetadata) => {
         });
 
         if (currentMetadata) {
-          // Atualizar metadados existentes
-          await executeWithRetry(async () => {
+          // Verificar se houve mudanças
+          if (!hasMetadataChanged(currentMetadata, {
+            name: formData.name,
+            symbol: formData.symbol,
+            uri: uploadedUri
+          })) {
+            setStatus({
+              loading: false,
+              message: "Nenhuma alteração detectada nos metadados.",
+              error: null,
+              feeConfirmed: false,
+              progress: 100
+            });
+            setTimeout(() => {
+              handleReset();
+            }, 3000);
+            return;
+          }
+        
+          // Se houve mudanças, atualizar
+          await retryOperation(async () => {
             const updateResponse = await metaplex.nfts().update({
               nftOrSft: currentMetadata,
               name: formData.name,
               symbol: formData.symbol,
               uri: uploadedUri,
+              creators: [{
+                address: publicKey,
+                share: 100,
+                verified: true
+              }],
+              isMutable: true,
+              primarySaleHappened: false,
               sellerFeeBasisPoints: 0,
-              creators: null,
             }, { commitment: 'confirmed' });
-
+        
             await connection.confirmTransaction(updateResponse.response.signature, 'confirmed');
           });
         } else {
           // Criar novos metadados
-          await executeWithRetry(async () => {
+          await retryOperation(async () => {
             const createResponse = await metaplex.nfts().create({
               uri: uploadedUri,
               name: formData.name,
@@ -470,6 +504,7 @@ const hasMetadataChanged = (currentMetadata, newMetadata) => {
               useExistingMint: mintPubkey,
               tokenOwner: publicKey,
               tokenStandard: 1,
+              isMutable: true,
               creators: [{
                 address: publicKey,
                 share: 100,
@@ -477,8 +512,11 @@ const hasMetadataChanged = (currentMetadata, newMetadata) => {
               }],
               collection: null,
               uses: null,
+              isCollection: false,
+              primarySaleHappened: false,
+              updateAuthority: publicKey,
             }, { commitment: 'confirmed' });
-
+        
             await connection.confirmTransaction(createResponse.response.signature, 'confirmed');
           });
         }
@@ -491,8 +529,7 @@ const hasMetadataChanged = (currentMetadata, newMetadata) => {
           progress: 100
         });
 
-        setTimeout(() => {
-          handleReset();
+        setTimeout(() => {handleReset();
         }, 3000);
 
       } catch (error) {
@@ -546,9 +583,6 @@ const hasMetadataChanged = (currentMetadata, newMetadata) => {
       });
     }
   };
-
-  //FIM FORMA COMO CRIAMOS METADADOS
-
 
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-8">
@@ -611,53 +645,51 @@ const hasMetadataChanged = (currentMetadata, newMetadata) => {
                 />
               </div>
 
-              {/* Nome */}
-<div>
-  <label className="block text-pink-300 text-sm mb-2">
-    Novo Nome * 
-    <span className="text-xs ml-2">
-      ({formData.name.length}/{MAX_NAME_LENGTH})
-    </span>
-  </label>
-  <input
-    type="text"
-    name="name"
-    placeholder="Ex: Nome Atualizado do Token"
-    value={formData.name}
-    onChange={handleInputChange}
-    maxLength={MAX_NAME_LENGTH}
-    required
-    readOnly={status.feeConfirmed}
-    className={`w-full px-3 py-2 bg-purple-900/30 text-white 
-      border border-purple-500/20 rounded-md 
-      focus:border-pink-500 transition-colors
-      ${status.feeConfirmed ? 'cursor-not-allowed opacity-70' : ''}`}
-  />
-</div>
+              <div>
+                <label className="block text-pink-300 text-sm mb-2">
+                  Novo Nome * 
+                  <span className="text-xs ml-2">
+                    ({formData.name.length}/{MAX_NAME_LENGTH})
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Ex: Nome Atualizado do Token"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  maxLength={MAX_NAME_LENGTH}
+                  required
+                  readOnly={status.feeConfirmed}
+                  className={`w-full px-3 py-2 bg-purple-900/30 text-white 
+                    border border-purple-500/20 rounded-md 
+                    focus:border-pink-500 transition-colors
+                    ${status.feeConfirmed ? 'cursor-not-allowed opacity-70' : ''}`}
+                />
+              </div>
 
-{/* Símbolo */}
-<div>
-  <label className="block text-pink-300 text-sm mb-2">
-    Novo Símbolo * 
-    <span className="text-xs ml-2">
-      ({formData.symbol.length}/{MAX_SYMBOL_LENGTH})
-    </span>
-  </label>
-  <input
-    type="text"
-    name="symbol"
-    placeholder="Ex: NTK"
-    value={formData.symbol}
-    onChange={handleInputChange}
-    maxLength={MAX_SYMBOL_LENGTH}
-    required
-    readOnly={status.feeConfirmed}
-    className={`w-full px-3 py-2 bg-purple-900/30 text-white 
-      border border-purple-500/20 rounded-md 
-      focus:border-pink-500 transition-colors
-      ${status.feeConfirmed ? 'cursor-not-allowed opacity-70' : ''}`}
-  />
-</div>
+              <div>
+                <label className="block text-pink-300 text-sm mb-2">
+                  Novo Símbolo * 
+                  <span className="text-xs ml-2">
+                    ({formData.symbol.length}/{MAX_SYMBOL_LENGTH})
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  name="symbol"
+                  placeholder="Ex: NTK"
+                  value={formData.symbol}
+                  onChange={handleInputChange}
+                  maxLength={MAX_SYMBOL_LENGTH}
+                  required
+                  readOnly={status.feeConfirmed}
+                  className={`w-full px-3 py-2 bg-purple-900/30 text-white 
+                    border border-purple-500/20 rounded-md 
+                    focus:border-pink-500 transition-colors
+                    ${status.feeConfirmed ? 'cursor-not-allowed opacity-70' : ''}`}
+                />
+              </div>
 
               <div>
                 <label className="block text-pink-300 text-sm mb-2">
@@ -806,18 +838,48 @@ const hasMetadataChanged = (currentMetadata, newMetadata) => {
             </div>
           </div>
 
-          {/* Status Messages */}
-          {status.message && (
-            <div className="mt-6 p-4 bg-purple-900/30 border border-purple-500/20 rounded-md">
-              <p className="text-yellow-400 text-sm text-center">{status.message}</p>
-            </div>
-          )}
 
-          {status.error && (
-            <div className="mt-6 p-4 bg-purple-900/30 border border-purple-500/20 rounded-md">
-              <p className="text-red-400 text-sm text-center">{status.error}</p>
-            </div>
-          )}
+{/* Status Messages */}
+{status.message && (
+  <div className="mt-6 p-4 bg-purple-900/30 border border-purple-500/20 rounded-md">
+    <p className="text-yellow-400 text-sm text-center">{status.message}</p>
+    
+    {/* Botão do Explorer - só aparece quando a mensagem é de sucesso */}
+    {status.message.includes("sucesso") && (
+      <div className="mt-3 text-center">
+        
+         <a
+          href={`https://solscan.io/token/${formData.mintAddress}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md
+            hover:bg-purple-700 transition-colors text-sm font-medium"
+        >
+          <svg 
+            className="w-4 h-4" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" 
+            />
+          </svg>
+          Ver Token na Explorer
+        </a>
+      </div>
+    )}
+  </div>
+)}
+
+{status.error && (
+  <div className="mt-6 p-4 bg-purple-900/30 border border-purple-500/20 rounded-md">
+    <p className="text-red-400 text-sm text-center">{status.error}</p>
+  </div>
+)}
 
           {/* Submit Button */}
           <div className="mt-6">
