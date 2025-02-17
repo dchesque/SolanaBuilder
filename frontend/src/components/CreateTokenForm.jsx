@@ -1,12 +1,14 @@
-// CreateTokenForm.jsx
 import React, { useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, FileEdit, Wallet } from "lucide-react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useNavigate } from "react-router-dom";
+import WalletConnect from "./WalletConnect";
 import CostEstimate from "./CostEstimate";
 import {
   Transaction,
   SystemProgram,
   Keypair,
-  PublicKey, // Adicionado para corrigir o erro
+  PublicKey,
 } from "@solana/web3.js";
 import {
   createInitializeMintInstruction,
@@ -16,19 +18,9 @@ import {
   TOKEN_PROGRAM_ID,
   MINT_SIZE,
 } from "@solana/spl-token";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useNavigate } from "react-router-dom";
 
 const SERVICE_WALLET = process.env.REACT_APP_SERVICE_WALLET;
 const SERVICE_FEE = parseFloat(process.env.REACT_APP_SERVICE_FEE);
-
-function validateTicker(ticker) {
-  if (!ticker) return ""; // Nenhuma mensagem se vazio
-  if (ticker.length > 6) {
-    return "Ticker must be a maximum of 6 characters.";
-  }
-  return "";
-}
 
 function CreateTokenForm() {
   const { connection } = useConnection();
@@ -38,11 +30,17 @@ function CreateTokenForm() {
   const [nomeToken, setNomeToken] = useState("");
   const [ticker, setTicker] = useState("");
   const [supply, setSupply] = useState("");
-  const [step, setStep] = useState(1); // Controle de Step
+  const [step, setStep] = useState(1);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const tickerError = validateTicker(ticker);
+  const validateTicker = (ticker) => {
+    if (!ticker) return "";
+    if (ticker.length > 6) {
+      return "Ticker must be a maximum of 6 characters.";
+    }
+    return "";
+  };
 
   const formatSupply = (supply) => {
     const num = Number(supply);
@@ -54,6 +52,7 @@ function CreateTokenForm() {
     return num.toString();
   };
 
+  const tickerError = validateTicker(ticker);
   const formattedSupply = formatSupply(supply);
 
   const handleConfirmDetails = async (e) => {
@@ -72,7 +71,7 @@ function CreateTokenForm() {
         SystemProgram.transfer({
           fromPubkey: publicKey,
           toPubkey: new PublicKey(SERVICE_WALLET),
-          lamports: SERVICE_FEE * 1e9, // Converte SOL para lamports
+          lamports: SERVICE_FEE * 1e9,
         })
       );
 
@@ -82,7 +81,7 @@ function CreateTokenForm() {
       const signature = await sendTransaction(transaction, connection);
       await connection.confirmTransaction(signature, "confirmed");
 
-      setStep(2); // Avança para Step 2 após confirmar a taxa
+      setStep(2);
       setMessage("Details confirmed successfully! You can now create your token.");
     } catch (err) {
       console.error(err);
@@ -165,7 +164,6 @@ function CreateTokenForm() {
 
       const signature = await sendTransaction(transaction, connection);
 
-      // Tenta confirmar a transação. Se ocorrer timeout, verifica se é o erro esperado.
       try {
         await connection.confirmTransaction(signature, "confirmed");
       } catch (confirmError) {
@@ -183,8 +181,6 @@ function CreateTokenForm() {
         `Token created successfully!\nAddress: ${mintKeypair.publicKey.toString()}\nName: ${nomeToken}\nTicker: ${ticker}`
       );
 
-      // Redireciona para a página de detalhes do token,
-      // passando os dados via state: endereço, nome, ticker e supply
       navigate("/token-details", {
         state: {
           tokenAddress: mintKeypair.publicKey.toString(),
@@ -201,80 +197,108 @@ function CreateTokenForm() {
     }
   };
 
+  if (!publicKey) {
+    return (
+      <div className="bg-[#150929] rounded-3xl p-10 shadow-xl">
+        <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">
+          Connect Your Wallet
+        </h1>
+        <p className="text-center text-sm text-purple-200/80 mb-8">
+          Connect your Solana wallet to start creating your token.
+        </p>
+        
+        <div className="flex flex-col items-center gap-6">
+          <div className="w-16 h-16 rounded-full bg-purple-500/10 flex items-center justify-center">
+            <Wallet className="w-8 h-8 text-purple-400" />
+          </div>
+          
+          <WalletConnect className="w-full px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:from-purple-500 hover:to-pink-500 transition-all duration-300 shadow-lg shadow-purple-500/25" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-md w-full mx-auto bg-[#1a012c] bg-opacity-90 rounded-xl p-6 shadow-xl border border-[#512d5a] animate-fadeIn">
-      <h1 className="text-3xl font-extrabold text-center mb-2 text-pink-300">
+    <div className="bg-[#150929] rounded-3xl p-10 shadow-xl">
+      <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">
         Launch Your Own Solana Token
       </h1>
-      <p className="text-center text-sm text-pink-200 mb-6">
+      <p className="text-center text-sm text-purple-200/80 mb-8">
         Empower your brand or community on the fast and low-cost Solana network.
         Create and launch your token in two steps.
       </p>
 
-      <form
-        onSubmit={step === 1 ? handleConfirmDetails : handleCreateToken}
-        className="space-y-5"
-      >
+      <form onSubmit={step === 1 ? handleConfirmDetails : handleCreateToken} className="space-y-6">
         <div>
-          <label className="block text-sm mb-1 text-pink-200">Token Name</label>
+          <label className="block text-sm mb-2 text-purple-200">Token Name</label>
           <input
             type="text"
             placeholder="Ex: My Awesome Token"
             value={nomeToken}
             onChange={(e) => setNomeToken(e.target.value)}
-            className="w-full rounded-md bg-[#11001c] border border-[#3b2153] px-3 py-2 text-pink-100 placeholder-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition"
+            className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
             disabled={step === 2}
           />
         </div>
 
         <div>
-          <label className="block text-sm mb-1 text-pink-200">Ticker</label>
+          <label className="block text-sm mb-2 text-purple-200">Ticker</label>
           <input
             type="text"
             placeholder="Ex: MAT"
             value={ticker}
             onChange={(e) => setTicker(e.target.value.toUpperCase())}
-            className={`w-full rounded-md bg-[#11001c] border ${
-              tickerError ? "border-red-500" : "border-[#3b2153]"
-            } px-3 py-2 text-pink-100 placeholder-pink-400 focus:outline-none focus:ring-2 ${
-              tickerError ? "focus:ring-red-500" : "focus:ring-pink-500"
-            } focus:border-transparent transition`}
+            className={`w-full h-12 rounded-xl bg-[#1D0F35] border ${
+              tickerError ? "border-red-500" : "border-purple-500/20"
+            } px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all`}
             disabled={step === 2}
           />
-          {tickerError && <p className="text-xs text-red-500 mt-1">{tickerError}</p>}
+          {tickerError && <p className="text-xs text-red-400 mt-1">{tickerError}</p>}
         </div>
 
         <div>
-          <label className="block text-sm mb-1 text-pink-200">Supply</label>
+          <label className="block text-sm mb-2 text-purple-200">Supply</label>
           <input
             type="number"
             placeholder="Ex: 1000000"
             value={supply}
             onChange={(e) => setSupply(e.target.value)}
-            className="w-full rounded-md bg-[#11001c] border border-[#3b2153] px-3 py-2 text-pink-100 placeholder-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition"
+            className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
             disabled={step === 2}
           />
           {formattedSupply && (
-            <p className="text-xs text-pink-300 mt-1">
-              You are creating <span className="font-semibold">{formattedSupply}</span> tokens
+            <p className="text-xs text-purple-300/80 mt-1">
+              You are creating <span className="font-medium text-purple-300">{formattedSupply}</span> tokens
             </p>
           )}
         </div>
 
-        {message && <p className="text-sm text-center text-yellow-400">{message}</p>}
+        {message && (
+          <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+            <p className="text-sm text-center text-purple-200">{message}</p>
+          </div>
+        )}
 
-        {/* Estimativa de Custo */}
-        <div className="mb-6 bg-[#2b1740] bg-opacity-50 rounded-lg p-4 border border-[#6e3d76] shadow-sm text-center">
+        <div className="p-4 rounded-xl bg-[#1D0F35] border border-purple-500/20">
           <CostEstimate />
         </div>
 
         <button
           type="submit"
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:from-purple-500 hover:to-pink-500 transition shadow-md hover:shadow-lg"
           disabled={loading}
+          className="w-full h-12 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:from-purple-500 hover:to-pink-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? "Processing..." : step === 1 ? "Step 1: Confirm Details" : "Step 2: Create Token"}{" "}
-          <ArrowRight className="w-4 h-4" />
+          {loading ? (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+              Processing...
+            </div>
+          ) : (
+            <>
+              {step === 1 ? "Step 1: Confirm Details" : "Step 2: Create Token"}
+              <ArrowRight className="w-4 h-4" />
+            </>
+          )}
         </button>
       </form>
     </div>
