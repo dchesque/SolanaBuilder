@@ -1,217 +1,382 @@
-// src/pages/LandingPage.js
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import React, { useState, useEffect } from 'react';
+import { 
+  Coins,
+  Globe,
+  Twitter,
+  Send as Telegram,
+  Github,
+  Link as LinkIcon,
+  Copy,
+  ArrowRightCircle,
+  Flame as BurnIcon,
+  Settings,
+  Sparkles,
+  Loader2
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { Metaplex, walletAdapterIdentity } from '@metaplex-foundation/js';
+import { Transaction, SystemProgram, PublicKey } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { Metadata } from '@metaplex-foundation/mpl-token-metadata';
 
-export default function LandingPage() {
-  const [showAdvanced, setShowAdvanced] = useState(false);
+// Componente do Card do Token
+const TokenCard = ({ token, onMint, onBurn, onPause }) => {
+  const [showActions, setShowActions] = useState(false);
+  const [loadingAction, setLoadingAction] = useState('');
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    // TODO: Adicionar notificação de sucesso
+  };
+
+  const handleAction = async (action) => {
+    setLoadingAction(action);
+    try {
+      switch (action) {
+        case 'mint':
+          await onMint(token);
+          break;
+        case 'burn':
+          await onBurn(token);
+          break;
+        case 'pause':
+          await onPause(token);
+          break;
+      }
+    } catch (error) {
+      console.error(`Error executing ${action}:`, error);
+      // TODO: Adicionar notificação de erro
+    }
+    setLoadingAction('');
+  };
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="container mx-auto px-4 py-8 flex items-center justify-between">
-        <div className="text-2xl font-bold text-white">
-          SolanaMint
+    <div className="bg-[#1D0F35]/50 backdrop-blur-sm rounded-xl border border-purple-500/20 p-6 hover:border-purple-500/40 transition-all duration-300">
+      <div className="flex items-start gap-6">
+        {/* Token Image */}
+        <div className="w-24 h-24 rounded-xl overflow-hidden bg-purple-900/30 flex-shrink-0">
+          {token.imageUrl ? (
+            <img
+              src={token.imageUrl}
+              alt={token.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Coins className="w-12 h-12 text-purple-400" />
+            </div>
+          )}
         </div>
-        <div className="flex items-center space-x-4">
-          <a href="#features" className="text-gray-300 hover:text-white">
-            Features
-          </a>
-          <a href="#how-it-works" className="text-gray-300 hover:text-white">
-            How It Works
-          </a>
-          <Link 
-            to="/token-creator" 
-            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition"
+
+        {/* Token Info */}
+        <div className="flex-grow">
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="text-xl font-bold text-white mb-1">{token.name}</h3>
+              <div className="flex items-center gap-2 text-purple-300 text-sm mb-3">
+                <span className="font-mono">{token.symbol}</span>
+                <button 
+                  onClick={() => copyToClipboard(token.address)}
+                  className="text-purple-400 hover:text-purple-300 transition-colors"
+                  title="Copy address"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowActions(!showActions)}
+              className="text-purple-400 hover:text-purple-300 transition-colors"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Token Details */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <div className="text-sm text-purple-300">Supply:</div>
+              <div className="font-medium text-white">{token.supply.toLocaleString()}</div>
+            </div>
+            <div>
+              <div className="text-sm text-purple-300">Created:</div>
+              <div className="font-medium text-white">{new Date(token.createdAt).toLocaleDateString()}</div>
+            </div>
+          </div>
+
+          {/* Social Links */}
+          <div className="flex items-center gap-3 mb-4">
+            {token.website && (
+              <a
+                href={token.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                <Globe className="w-4 h-4" />
+              </a>
+            )}
+            {token.twitter && (
+              <a
+                href={token.twitter}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                <Twitter className="w-4 h-4" />
+              </a>
+            )}
+            {token.telegram && (
+              <a
+                href={token.telegram}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                <Telegram className="w-4 h-4" />
+              </a>
+            )}
+            {token.github && (
+              <a
+                href={token.github}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                <Github className="w-4 h-4" />
+              </a>
+            )}
+          </div>
+
+          {/* Token Functions */}
+          {showActions && (
+            <div className="mt-4 p-4 bg-purple-900/20 rounded-lg border border-purple-500/20">
+              <div className="text-sm font-medium text-purple-300 mb-3">Token Actions:</div>
+              <div className="grid grid-cols-2 gap-3">
+                {token.isMintable && (
+                  <button
+                    onClick={() => handleAction('mint')}
+                    disabled={!!loadingAction}
+                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-white text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loadingAction === 'mint' ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                    Mint Tokens
+                  </button>
+                )}
+                {token.isBurnable && (
+                  <button
+                    onClick={() => handleAction('burn')}
+                    disabled={!!loadingAction}
+                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loadingAction === 'burn' ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <BurnIcon className="w-4 h-4" />
+                    )}
+                    Burn Tokens
+                  </button>
+                )}
+                {token.isPausable && (
+                  <button
+                    onClick={() => handleAction('pause')}
+                    disabled={!!loadingAction}
+                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-white text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loadingAction === 'pause' ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Settings className="w-4 h-4" />
+                    )}
+                    {token.isPaused ? 'Unpause Token' : 'Pause Token'}
+                  </button>
+                )}
+                <Link
+                  to={`/update-metadata?tokenAddress=${token.address}`}
+                  className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-white text-sm transition-all"
+                >
+                  <Settings className="w-4 h-4" />
+                  Update Info
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Componente principal da lista de tokens
+export default function UserTokensList() {
+  const { connection } = useConnection();
+  const wallet = useWallet();
+  const { publicKey } = wallet;
+  
+  const [tokens, setTokens] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Funções para manipular tokens
+  const handleMint = async (token) => {
+    // Implementar lógica de mint
+  };
+
+  const handleBurn = async (token) => {
+    // Implementar lógica de burn
+  };
+
+  const handlePause = async (token) => {
+    // Implementar lógica de pause
+  };
+
+  // Efeito para carregar os tokens
+  useEffect(() => {
+    const fetchUserTokens = async () => {
+      if (!publicKey) return;
+    
+      try {
+        setLoading(true);
+        setError(null);
+    
+        const metaplex = new Metaplex(connection);
+        metaplex.use(walletAdapterIdentity(wallet));
+        
+        // Buscar todos os tokens que o usuário tem
+        const allTokenAccounts = await connection.getParsedTokenAccountsByOwner(
+          publicKey,
+          { programId: TOKEN_PROGRAM_ID }
+        );
+    
+        // Filtrar e mapear os tokens
+        const myTokens = await Promise.all(
+          allTokenAccounts.value
+            .filter(tokenAccount => {
+              const tokenData = tokenAccount.account.data.parsed.info;
+              // Verificar se é owner do token (tem mint authority)
+              return tokenData.tokenAmount.amount !== "0";
+            })
+            .map(async (tokenAccount) => {
+              const tokenData = tokenAccount.account.data.parsed.info;
+              const tokenMint = new PublicKey(tokenData.mint);
+    
+              try {
+                // Buscar metadata do token
+                const metadataPDA = await Metadata.getPDA(tokenMint);
+                const metadata = await Metadata.load(connection, metadataPDA);
+                
+                // Buscar dados extras do URI se existir
+                let externalMetadata = {};
+                if (metadata.data.data.uri) {
+                  try {
+                    const response = await fetch(metadata.data.data.uri);
+                    externalMetadata = await response.json();
+                  } catch (err) {
+                    console.error('Error fetching token external metadata:', err);
+                  }
+                }
+    
+                return {
+                  name: metadata.data.data.name || 'Unknown Token',
+                  symbol: metadata.data.data.symbol || '',
+                  address: tokenMint.toString(),
+                  supply: tokenData.tokenAmount.uiAmount,
+                  createdAt: new Date(), // Pode buscar o timestamp da criação se necessário
+                  imageUrl: externalMetadata.image || null,
+                  website: externalMetadata.external_url || externalMetadata.links?.website || null,
+                  twitter: externalMetadata.links?.twitter || null,
+                  telegram: externalMetadata.links?.telegram || null,
+                  github: externalMetadata.links?.github || null,
+                  isMintable: true, // Verificar mint authority
+                  isBurnable: true,
+                  isPausable: false,
+                  isPaused: false
+                };
+              } catch (err) {
+                console.error('Error loading token metadata:', err);
+                return null;
+              }
+            })
+        );
+    
+        // Remover tokens que falharam ao carregar metadata
+        const validTokens = myTokens.filter(token => token !== null);
+        setTokens(validTokens);
+      } catch (err) {
+        console.error('Error fetching tokens:', err);
+        setError('Failed to load tokens. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserTokens();
+  }, [connection, publicKey, wallet]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12 bg-[#1D0F35]/50 backdrop-blur-sm rounded-xl border border-purple-500/20">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-purple-400 animate-spin mx-auto mb-4" />
+          <p className="text-purple-200">Loading your tokens...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12 bg-[#1D0F35]/50 backdrop-blur-sm rounded-xl border border-purple-500/20">
+        <div className="text-red-400 mb-4">
+          <svg className="w-12 h-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h3 className="text-xl font-bold text-white mb-2">Error Loading Tokens</h3>
+        <p className="text-purple-300 mb-6">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-500/20 text-white font-semibold hover:bg-purple-500/30 transition-all"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {tokens.length === 0 ? (
+        <div className="text-center py-12 bg-[#1D0F35]/50 backdrop-blur-sm rounded-xl border border-purple-500/20">
+          <Coins className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-white mb-2">No Tokens Found</h3>
+          <p className="text-purple-300 mb-6">You haven't created any tokens yet.</p>
+          <Link
+            to="/token-creator"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:from-purple-500 hover:to-pink-500 transition-all"
           >
-            Create Token
+            <ArrowRightCircle className="w-5 h-5" />
+            Create Your First Token
           </Link>
         </div>
-      </div>
-
-      <div className="container mx-auto px-4 flex flex-col md:flex-row items-center py-16">
-        <div className="md:w-1/2 pr-8">
-          <h1 className="text-5xl font-bold mb-6 text-white">
-            Create Your Own Solana Token in Minutes
-          </h1>
-          <p className="text-xl text-gray-300 mb-8">
-            With SolanaMint, anyone can easily design and deploy a custom token on the secure and affordable Solana blockchain. No coding skills needed—just simple, fast, and cost-effective token creation.
-          </p>
-          
-          <div className="flex space-x-4">
-            <Link 
-              to="/token-creator" 
-              className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition flex items-center"
-            >
-              Start Creating Tokens
-              <ArrowRight className="ml-2 w-5 h-5" />
-            </Link>
-          </div>
+      ) : (
+        <div className="grid gap-6">
+          {tokens.map((token) => (
+            <TokenCard 
+              key={token.address} 
+              token={token}
+              onMint={handleMint}
+              onBurn={handleBurn}
+              onPause={handlePause}
+            />
+          ))}
         </div>
-        
-        <div className="md:w-1/2 bg-gray-800 rounded-lg p-6 mt-8 md:mt-0">
-          <form className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Token name</label>
-              <input 
-                type="text" 
-                placeholder="Ethereum" 
-                className="w-full bg-gray-700 text-white px-3 py-2 rounded-md border border-gray-600 focus:border-purple-500"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Token symbol</label>
-              <input 
-                type="text" 
-                placeholder="ETH" 
-                className="w-full bg-gray-700 text-white px-3 py-2 rounded-md border border-gray-600 focus:border-purple-500"
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Initial supply</label>
-                <input 
-                  type="number" 
-                  placeholder="1000000" 
-                  className="w-full bg-gray-700 text-white px-3 py-2 rounded-md border border-gray-600 focus:border-purple-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Decimals</label>
-                <input 
-                  type="number" 
-                  placeholder="18" 
-                  className="w-full bg-gray-700 text-white px-3 py-2 rounded-md border border-gray-600 focus:border-purple-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <button 
-                type="button"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="text-purple-400 hover:text-purple-300"
-              >
-                Advanced features {showAdvanced ? '▲' : '▼'}
-              </button>
-            </div>
-
-            {showAdvanced && (
-              <div className="space-y-4">
-                <div className="flex items-center">
-                  <input 
-                    type="checkbox" 
-                    className="mr-2 bg-gray-700 text-purple-600 focus:ring-purple-500"
-                  />
-                  <label className="text-gray-300">Taxable</label>
-                </div>
-                <div className="flex items-center">
-                  <input 
-                    type="checkbox" 
-                    className="mr-2 bg-gray-700 text-purple-600 focus:ring-purple-500"
-                  />
-                  <label className="text-gray-300">Deflationary</label>
-                </div>
-              </div>
-            )}
-
-            <div className="pt-4">
-              <Link 
-                to="/token-creator" 
-                className="w-full bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition text-center block"
-              >
-                Create Token
-              </Link>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      {/* Features Section */}
-      <section id="features" className="bg-gray-900 py-16">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12 text-white">
-            Why Choose SolanaMint?
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                title: "Fast & Easy",
-                description: "Launch your token with just a few clicks—no technical expertise required.",
-              },
-              {
-                title: "Secure",
-                description: "Powered by Solana's robust blockchain, ensuring your token is safe and scalable.",
-              },
-              {
-                title: "Low Fees",
-                description: "Enjoy minimal transaction fees, making token creation both affordable and efficient.",
-              },
-            ].map((feature, index) => (
-              <div
-                key={index}
-                className="bg-gray-800 rounded-lg p-6 text-center"
-              >
-                <h3 className="text-xl font-semibold mb-2 text-white">{feature.title}</h3>
-                <p className="text-gray-300">{feature.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works Section */}
-      <section id="how-it-works" className="py-16">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12 text-white">
-            How It Works
-          </h2>
-          <ol className="space-y-8 max-w-2xl mx-auto">
-            {[{
-              step: "1",
-              title: "Connect Your Wallet",
-              description: "Start by connecting your Solana wallet (Phantom, Solflare, or MetaMask) to the app."
-            }, {
-              step: "2",
-              title: "Confirm Network Connection",
-              description: "Double-check that you're properly connected to the Solana network to ensure smooth operation."
-            }, {
-              step: "3",
-              title: "Enter Token Details",
-              description: "Input your token's name, symbol, and total supply. Then confirm the transaction to proceed."
-            }, {
-              step: "4",
-              title: "Send to Blockchain",
-              description: "Submit your token details to the blockchain and wait for confirmation."
-            }].map(({ step, title, description }, index) => (
-              <li key={index} className="bg-gray-800 p-6 rounded-lg">
-                <div className="flex items-center mb-4">
-                  <span className="w-10 h-10 bg-purple-600 text-white rounded-full flex items-center justify-center mr-4 font-bold">
-                    {step}
-                  </span>
-                  <h3 className="text-xl font-semibold text-white">{title}</h3>
-                </div>
-                <p className="text-gray-300 pl-14">{description}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 py-8">
-        <div className="container mx-auto px-4 flex justify-between items-center">
-          <div className="text-xl font-bold text-white">
-            SolanaMint
-          </div>
-          <div className="flex space-x-4 text-gray-300">
-            <a href="#" className="hover:text-white">Terms of Service</a>
-            <a href="#" className="hover:text-white">Privacy Policy</a>
-            <a href="#" className="hover:text-white">Contact</a>
-          </div>
-        </div>
-      </footer>
+      )}
     </div>
   );
 }

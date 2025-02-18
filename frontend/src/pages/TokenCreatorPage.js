@@ -78,7 +78,7 @@ export default function TokenCreatorPage() {
   </Link>
   
   <Link
-    to="/update-token"
+    to="/update-metadata"
     className="px-4 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-white text-sm font-medium flex items-center gap-2 transition-all"
   >
     <FileEdit className="w-4 h-4" />
