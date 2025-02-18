@@ -70,7 +70,7 @@ export default function TokenCreatorPage() {
             </div>
             <div className="flex items-center gap-4">
   <Link
-    to="/manage-tokens"
+    to="/my-tokens"
     className="px-4 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-white text-sm font-medium flex items-center gap-2 transition-all"
   >
     <LayoutGrid className="w-4 h-4" />

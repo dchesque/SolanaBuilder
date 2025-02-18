@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { ArrowRight, FileEdit, Wallet } from "lucide-react";
+import { ArrowRight, FileEdit, Wallet, HelpCircle } from "lucide-react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useNavigate } from "react-router-dom";
 import WalletConnect from "./WalletConnect";
 import CostEstimate from "./CostEstimate";
+import TokenFeatureToggle from './TokenFeatureToggle';
 import {
   Transaction,
   SystemProgram,
@@ -33,6 +34,12 @@ function CreateTokenForm() {
   const [step, setStep] = useState(1);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [tokenFeatures, setTokenFeatures] = useState({
+    mintable: false,
+    burnable: false,
+    freezable: false,
+    metadata: false
+  });
 
   const validateTicker = (ticker) => {
     if (!ticker) return "";
@@ -177,18 +184,19 @@ function CreateTokenForm() {
         }
       }
 
-      setMessage(
-        `Token created successfully!\nAddress: ${mintKeypair.publicKey.toString()}\nName: ${nomeToken}\nTicker: ${ticker}`
-      );
-
       navigate("/token-details", {
         state: {
           tokenAddress: mintKeypair.publicKey.toString(),
           tokenName: nomeToken,
           ticker: ticker,
           supply: mintAmount,
+          features: tokenFeatures
         },
       });
+
+      setMessage(
+        `Token created successfully!\nAddress: ${mintKeypair.publicKey.toString()}\nName: ${nomeToken}\nTicker: ${ticker}`
+      );
     } catch (err) {
       console.error(err);
       setMessage("Error creating token: " + err.message);
@@ -272,6 +280,54 @@ function CreateTokenForm() {
             </p>
           )}
         </div>
+
+        {/* Token Features Section - Commented Out
+        <div>
+          <label className="block text-sm mb-4 text-purple-200">Token Features</label>
+          <div className="grid grid-cols-2 gap-4">
+            <TokenFeatureToggle
+              label="Mintable"
+              tooltipInfo="Allows creating new tokens after initial minting. Only the token creator can issue new tokens."
+              isChecked={tokenFeatures.mintable}
+              onChange={(e) => setTokenFeatures({
+                ...tokenFeatures, 
+                mintable: e.target.checked
+              })}
+              disabled={step === 2}
+            />
+            <TokenFeatureToggle
+              label="Burnable"
+              tooltipInfo="Enables token destruction, reducing the total supply. Useful for inflation control."
+              isChecked={tokenFeatures.burnable}
+              onChange={(e) => setTokenFeatures({
+                ...tokenFeatures, 
+                burnable: e.target.checked
+              })}
+              disabled={step === 2}
+            />
+            <TokenFeatureToggle
+              label="Freezable"
+              tooltipInfo="Allows freezing tokens in a specific account, temporarily preventing transfers."
+              isChecked={tokenFeatures.freezable}
+              onChange={(e) => setTokenFeatures({
+                ...tokenFeatures, 
+                freezable: e.target.checked
+              })}
+              disabled={step === 2}
+            />
+            <TokenFeatureToggle
+              label="Metadata"
+              tooltipInfo="Adds custom metadata to the token, such as description, image, or specific properties."
+              isChecked={tokenFeatures.metadata}
+              onChange={(e) => setTokenFeatures({
+                ...tokenFeatures, 
+                metadata: e.target.checked
+              })}
+              disabled={step === 2}
+            />
+          </div>
+        </div>
+        */}
 
         {message && (
           <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Coins,
   Globe,
@@ -7,210 +8,17 @@ import {
   Github,
   Link as LinkIcon,
   Copy,
-  ArrowRightCircle,
-  Flame as BurnIcon,
+  LayoutGrid,
   Settings,
   Sparkles,
-  Loader2
+  Loader2,
+  Flame as BurnIcon
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { Metaplex, walletAdapterIdentity } from '@metaplex-foundation/js';
 import { Transaction, SystemProgram, PublicKey } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { Metadata } from '@metaplex-foundation/mpl-token-metadata';
-
-// Componente do Card do Token
-const TokenCard = ({ token, onMint, onBurn, onPause }) => {
-  const [showActions, setShowActions] = useState(false);
-  const [loadingAction, setLoadingAction] = useState('');
-
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    // TODO: Adicionar notificação de sucesso
-  };
-
-  const handleAction = async (action) => {
-    setLoadingAction(action);
-    try {
-      switch (action) {
-        case 'mint':
-          await onMint(token);
-          break;
-        case 'burn':
-          await onBurn(token);
-          break;
-        case 'pause':
-          await onPause(token);
-          break;
-      }
-    } catch (error) {
-      console.error(`Error executing ${action}:`, error);
-      // TODO: Adicionar notificação de erro
-    }
-    setLoadingAction('');
-  };
-
-  return (
-    <div className="bg-[#1D0F35]/50 backdrop-blur-sm rounded-xl border border-purple-500/20 p-6 hover:border-purple-500/40 transition-all duration-300">
-      <div className="flex items-start gap-6">
-        {/* Token Image */}
-        <div className="w-24 h-24 rounded-xl overflow-hidden bg-purple-900/30 flex-shrink-0">
-          {token.imageUrl ? (
-            <img
-              src={token.imageUrl}
-              alt={token.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Coins className="w-12 h-12 text-purple-400" />
-            </div>
-          )}
-        </div>
-
-        {/* Token Info */}
-        <div className="flex-grow">
-          <div className="flex justify-between items-start">
-            <div>
-              <h3 className="text-xl font-bold text-white mb-1">{token.name}</h3>
-              <div className="flex items-center gap-2 text-purple-300 text-sm mb-3">
-                <span className="font-mono">{token.symbol}</span>
-                <button 
-                  onClick={() => copyToClipboard(token.address)}
-                  className="text-purple-400 hover:text-purple-300 transition-colors"
-                  title="Copy address"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowActions(!showActions)}
-              className="text-purple-400 hover:text-purple-300 transition-colors"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Token Details */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <div className="text-sm text-purple-300">Supply:</div>
-              <div className="font-medium text-white">{token.supply.toLocaleString()}</div>
-            </div>
-            <div>
-              <div className="text-sm text-purple-300">Created:</div>
-              <div className="font-medium text-white">{new Date(token.createdAt).toLocaleDateString()}</div>
-            </div>
-          </div>
-
-          {/* Social Links */}
-          <div className="flex items-center gap-3 mb-4">
-            {token.website && (
-              <a
-                href={token.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-purple-400 hover:text-purple-300 transition-colors"
-              >
-                <Globe className="w-4 h-4" />
-              </a>
-            )}
-            {token.twitter && (
-              <a
-                href={token.twitter}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-purple-400 hover:text-purple-300 transition-colors"
-              >
-                <Twitter className="w-4 h-4" />
-              </a>
-            )}
-            {token.telegram && (
-              <a
-                href={token.telegram}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-purple-400 hover:text-purple-300 transition-colors"
-              >
-                <Telegram className="w-4 h-4" />
-              </a>
-            )}
-            {token.github && (
-              <a
-                href={token.github}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-purple-400 hover:text-purple-300 transition-colors"
-              >
-                <Github className="w-4 h-4" />
-              </a>
-            )}
-          </div>
-
-          {/* Token Functions */}
-          {showActions && (
-            <div className="mt-4 p-4 bg-purple-900/20 rounded-lg border border-purple-500/20">
-              <div className="text-sm font-medium text-purple-300 mb-3">Token Actions:</div>
-              <div className="grid grid-cols-2 gap-3">
-                {token.isMintable && (
-                  <button
-                    onClick={() => handleAction('mint')}
-                    disabled={!!loadingAction}
-                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-white text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loadingAction === 'mint' ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-4 h-4" />
-                    )}
-                    Mint Tokens
-                  </button>
-                )}
-                {token.isBurnable && (
-                  <button
-                    onClick={() => handleAction('burn')}
-                    disabled={!!loadingAction}
-                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loadingAction === 'burn' ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <BurnIcon className="w-4 h-4" />
-                    )}
-                    Burn Tokens
-                  </button>
-                )}
-                {token.isPausable && (
-                  <button
-                    onClick={() => handleAction('pause')}
-                    disabled={!!loadingAction}
-                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-white text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loadingAction === 'pause' ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Settings className="w-4 h-4" />
-                    )}
-                    {token.isPaused ? 'Unpause Token' : 'Pause Token'}
-                  </button>
-                )}
-                <Link
-                  to={`/update-metadata?tokenAddress=${token.address}`}
-                  className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-white text-sm transition-all"
-                >
-                  <Settings className="w-4 h-4" />
-                  Update Info
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // Componente principal da lista de tokens
 export default function UserTokensList() {
@@ -221,6 +29,12 @@ export default function UserTokensList() {
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showActions, setShowActions] = useState({});
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    // TODO: Adicionar notificação de sucesso
+  };
 
   // Funções para manipular tokens
   const handleMint = async (token) => {
@@ -235,6 +49,21 @@ export default function UserTokensList() {
     // Implementar lógica de pause
   };
 
+  const handleAction = async (action, token) => {
+    // Implementar lógica de ações
+    switch (action) {
+      case 'mint':
+        await handleMint(token);
+        break;
+      case 'burn':
+        await handleBurn(token);
+        break;
+      case 'pause':
+        await handlePause(token);
+        break;
+    }
+  };
+
   // Efeito para carregar os tokens
   useEffect(() => {
     const fetchUserTokens = async () => {
@@ -244,68 +73,134 @@ export default function UserTokensList() {
         setLoading(true);
         setError(null);
     
+        // Inicializa o Metaplex
         const metaplex = new Metaplex(connection);
         metaplex.use(walletAdapterIdentity(wallet));
-        
-        // Buscar todos os tokens que o usuário tem
-        const allTokenAccounts = await connection.getParsedTokenAccountsByOwner(
+
+        // Buscar todos os Mints da wallet usando getParsedTokenAccountsByOwner
+        const ownedTokens = await connection.getParsedTokenAccountsByOwner(
           publicKey,
           { programId: TOKEN_PROGRAM_ID }
         );
-    
-        // Filtrar e mapear os tokens
+
+        console.log('Wallet publicKey:', publicKey.toString());
+        console.log('Token accounts found:', ownedTokens.value.length);
+
+        // Array para armazenar as mint addresses únicas
+        const uniqueMints = new Set();
+
+        // Buscar informações de cada token
         const myTokens = await Promise.all(
-          allTokenAccounts.value
-            .filter(tokenAccount => {
-              const tokenData = tokenAccount.account.data.parsed.info;
-              // Verificar se é owner do token (tem mint authority)
-              return tokenData.tokenAmount.amount !== "0";
-            })
-            .map(async (tokenAccount) => {
-              const tokenData = tokenAccount.account.data.parsed.info;
-              const tokenMint = new PublicKey(tokenData.mint);
-    
+          ownedTokens.value.map(async ({ account }) => {
+            try {
+              const tokenData = account.data.parsed.info;
+              const mintAddress = new PublicKey(tokenData.mint);
+
+              // Pular se já processamos este mint
+              if (uniqueMints.has(mintAddress.toString())) {
+                return null;
+              }
+
+              // Verificar se a wallet é mint authority
+              const mintInfo = await connection.getParsedAccountInfo(mintAddress);
+              if (!mintInfo.value) return null;
+              
+              const mintData = mintInfo.value.data.parsed.info;
+              
+              // Verificar se a wallet é mint authority
+              if (mintData.mintAuthority !== publicKey.toString()) {
+                return null;
+              }
+
+              uniqueMints.add(mintAddress.toString());
+
               try {
-                // Buscar metadata do token
-                const metadataPDA = await Metadata.getPDA(tokenMint);
-                const metadata = await Metadata.load(connection, metadataPDA);
+                // Buscar metadata do token usando Metaplex
+                const nft = await metaplex.nfts().findByMint({ mintAddress });
+                console.log('Token metadata:', nft);
                 
                 // Buscar dados extras do URI se existir
                 let externalMetadata = {};
-                if (metadata.data.data.uri) {
+                if (nft.uri) {
                   try {
-                    const response = await fetch(metadata.data.data.uri);
+                    const response = await fetch(nft.uri);
                     externalMetadata = await response.json();
+                    console.log('External metadata:', externalMetadata);
                   } catch (err) {
                     console.error('Error fetching token external metadata:', err);
                   }
                 }
-    
+
                 return {
-                  name: metadata.data.data.name || 'Unknown Token',
-                  symbol: metadata.data.data.symbol || '',
-                  address: tokenMint.toString(),
-                  supply: tokenData.tokenAmount.uiAmount,
-                  createdAt: new Date(), // Pode buscar o timestamp da criação se necessário
+                  name: nft.name || 'Unknown Token',
+                  symbol: nft.symbol || '',
+                  address: mintAddress.toString(),
+                  supply: parseInt(mintData.supply) / Math.pow(10, mintData.decimals),
+                  createdAt: new Date(),
                   imageUrl: externalMetadata.image || null,
                   website: externalMetadata.external_url || externalMetadata.links?.website || null,
                   twitter: externalMetadata.links?.twitter || null,
                   telegram: externalMetadata.links?.telegram || null,
                   github: externalMetadata.links?.github || null,
-                  isMintable: true, // Verificar mint authority
+                  isMintable: true,
                   isBurnable: true,
                   isPausable: false,
                   isPaused: false
                 };
-              } catch (err) {
-                console.error('Error loading token metadata:', err);
-                return null;
+              } catch (metaplexErr) {
+                console.error('Error loading token metadata from Metaplex:', metaplexErr);
+                
+                // Método alternativo usando Metadata PDA
+                try {
+                  const metadataPDA = await Metadata.getPDA(mintAddress);
+                  const metadata = await Metadata.load(connection, metadataPDA);
+                  
+                  return {
+                    name: metadata.data.data.name || 'Unknown Token',
+                    symbol: metadata.data.data.symbol || '',
+                    address: mintAddress.toString(),
+                    supply: parseInt(mintData.supply) / Math.pow(10, mintData.decimals),
+                    createdAt: new Date(),
+                    imageUrl: null,
+                    website: null,
+                    twitter: null,
+                    telegram: null,
+                    github: null,
+                    isMintable: true,
+                    isBurnable: true,
+                    isPausable: false,
+                    isPaused: false
+                  };
+                } catch (pdaErr) {
+                  console.error('Error loading token metadata from PDA:', pdaErr);
+                  return {
+                    name: 'Unknown Token',
+                    symbol: '',
+                    address: mintAddress.toString(),
+                    supply: parseInt(mintData.supply) / Math.pow(10, mintData.decimals),
+                    createdAt: new Date(),
+                    imageUrl: null,
+                    website: null,
+                    twitter: null,
+                    telegram: null,
+                    github: null,
+                    isMintable: true,
+                    isBurnable: true,
+                    isPausable: false,
+                    isPaused: false
+                  };
+                }
               }
-            })
+            } catch (err) {
+              console.error('Error processing token account:', err);
+              return null;
+            }
+          })
         );
     
         // Remover tokens que falharam ao carregar metadata
         const validTokens = myTokens.filter(token => token !== null);
+        console.log('Valid tokens found:', validTokens.length);
         setTokens(validTokens);
       } catch (err) {
         console.error('Error fetching tokens:', err);
@@ -350,30 +245,162 @@ export default function UserTokensList() {
   }
 
   return (
-    <div className="space-y-6">
+    <div>
+      {/* View Controls */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <div className="text-sm text-purple-300">
+            {tokens.length} {tokens.length === 1 ? 'Token' : 'Tokens'} Found
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="p-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 transition-all">
+            <LayoutGrid className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
       {tokens.length === 0 ? (
-        <div className="text-center py-12 bg-[#1D0F35]/50 backdrop-blur-sm rounded-xl border border-purple-500/20">
-          <Coins className="w-12 h-12 text-purple-400 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-white mb-2">No Tokens Found</h3>
-          <p className="text-purple-300 mb-6">You haven't created any tokens yet.</p>
+        <div className="flex flex-col items-center justify-center p-12 bg-[#1D0F35]/30 backdrop-blur-sm rounded-2xl border border-purple-500/20">
+          <div className="bg-purple-900/30 p-4 rounded-full mb-6">
+            <Coins className="w-10 h-10 text-purple-400" />
+          </div>
+          <h3 className="text-2xl font-bold text-white mb-3">No Tokens Found</h3>
+          <p className="text-purple-300 text-center mb-8 max-w-md">
+            You haven't created any tokens yet. Start by creating your first token.
+          </p>
           <Link
             to="/token-creator"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:from-purple-500 hover:to-pink-500 transition-all"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:from-purple-500 hover:to-pink-500 transition-all duration-300 shadow-lg shadow-purple-500/25"
           >
-            <ArrowRightCircle className="w-5 h-5" />
+            <Sparkles className="w-5 h-5" />
             Create Your First Token
           </Link>
         </div>
       ) : (
-        <div className="grid gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {tokens.map((token) => (
-            <TokenCard 
-              key={token.address} 
-              token={token}
-              onMint={handleMint}
-              onBurn={handleBurn}
-              onPause={handlePause}
-            />
+            <div key={token.address} className="group">
+              <div className="bg-[#1D0F35]/30 backdrop-blur-sm rounded-2xl border border-purple-500/20 p-6 hover:border-purple-500/40 transition-all duration-300 h-full">
+                {/* Token Header */}
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-purple-900/30 flex-shrink-0">
+                      {token.imageUrl ? (
+                        <img
+                          src={token.imageUrl}
+                          alt={token.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Coins className="w-8 h-8 text-purple-400" />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-xl font-bold text-white">{token.name}</h3>
+                        <span className="px-2 py-0.5 bg-purple-500/20 rounded-md text-sm font-medium text-purple-300">
+                          {token.symbol}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-purple-300 text-sm">
+                        <span className="font-mono truncate max-w-[150px]">{token.address}</span>
+                        <button
+                          onClick={() => copyToClipboard(token.address)}
+                          className="text-purple-400 hover:text-purple-300 transition-colors"
+                          title="Copy address"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowActions(prev => ({ ...prev, [token.address]: !prev[token.address] }))}
+                    className="p-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 hover:text-purple-300 transition-all"
+                  >
+                    <Settings className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Token Details */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-purple-900/20 rounded-xl p-4">
+                    <div className="text-sm text-purple-300 mb-1">Supply</div>
+                    <div className="font-medium text-white">
+                      {token.supply.toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="bg-purple-900/20 rounded-xl p-4">
+                    <div className="text-sm text-purple-300 mb-1">Created</div>
+                    <div className="font-medium text-white">
+                      {new Date(token.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Social Links */}
+                {(token.website || token.twitter || token.telegram || token.github) && (
+                  <div className="flex items-center gap-3 mb-6 p-4 bg-purple-900/20 rounded-xl">
+                    {token.website && (
+                      <a
+                        href={token.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 hover:text-purple-300 transition-all"
+                      >
+                        <Globe className="w-4 h-4" />
+                      </a>
+                    )}
+                    {token.twitter && (
+                      <a
+                        href={token.twitter}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 hover:text-purple-300 transition-all"
+                      >
+                        <Twitter className="w-4 h-4" />
+                      </a>
+                    )}
+                    {token.telegram && (
+                      <a
+                        href={token.telegram}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 hover:text-purple-300 transition-all"
+                      >
+                        <Telegram className="w-4 h-4" />
+                      </a>
+                    )}
+                    {token.github && (
+                      <a
+                        href={token.github}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 hover:text-purple-300 transition-all"
+                      >
+                        <Github className="w-4 h-4" />
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {/* Token Actions */}
+                {showActions[token.address] && (
+                  <div className="mt-6">
+                    <Link
+                      to={`/update-metadata?tokenAddress=${token.address}`}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-white font-medium transition-all"
+                    >
+                      <Settings className="w-4 h-4" />
+                      Update Token Info
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </div>
           ))}
         </div>
       )}
