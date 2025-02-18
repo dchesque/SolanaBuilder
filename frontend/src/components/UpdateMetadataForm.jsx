@@ -12,9 +12,18 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
+import { 
+  getAssociatedTokenAddress, 
+  TOKEN_PROGRAM_ID 
+} from "@solana/spl-token";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Transaction, SystemProgram, PublicKey } from "@solana/web3.js";
+import { 
+  Transaction, 
+  SystemProgram, 
+  PublicKey,
+  ComputeBudgetProgram 
+} from "@solana/web3.js";
 import { Metaplex, walletAdapterIdentity } from "@metaplex-foundation/js";
 import CostEstimate from "./CostEstimate";
 import WalletConnect from "./WalletConnect";
@@ -30,8 +39,8 @@ function UpdateMetadataForm() {
   const wallet = useWallet();
   const { publicKey, sendTransaction } = wallet;
 
-  // Estados
   const [showSocialLinks, setShowSocialLinks] = useState(false);
+  const [metadataExists, setMetadataExists] = useState(false);
 
   const [formData, setFormData] = useState({
     mintAddress: "",
@@ -54,7 +63,6 @@ function UpdateMetadataForm() {
     showPreview: false
   });
 
-  // Effects
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tokenAddress = urlParams.get('tokenAddress');
@@ -77,7 +85,6 @@ function UpdateMetadataForm() {
     }
   }, [formData.imageUrl]);
 
-  // Funções auxiliares
   const validateUrl = (url) => {
     if (!url) return true;
     try {
@@ -138,38 +145,81 @@ function UpdateMetadataForm() {
       showPreview: false
     });
     setShowSocialLinks(false);
+    setMetadataExists(false);
   };
 
   const loadCurrentMetadata = async (mintAddress) => {
     try {
       const mintPubkey = new PublicKey(mintAddress);
       const metaplex = new Metaplex(connection);
+      metaplex.use(walletAdapterIdentity(wallet));
       
-      const nft = await metaplex.nfts().findByMint({ mintAddress: mintPubkey });
-      if (nft) {
-        const response = await fetch(nft.uri);
-        const metadata = await response.json();
+      // Primeiro, verificar se o token existe
+      try {
+        const mintInfo = await connection.getAccountInfo(mintPubkey);
+        if (!mintInfo) {
+          throw new Error("Token not found");
+        }
+      } catch (error) {
+        console.error("Error checking mint:", error);
+        throw new Error("Invalid token address");
+      }
+      
+      // Tentar carregar os metadados existentes
+      const pda = metaplex.nfts().pdas().metadata({ mint: mintPubkey });
+      const metadataAccount = await connection.getAccountInfo(pda);
+      
+      if (metadataAccount) {
+        setMetadataExists(true);
+        const nft = await metaplex.nfts().findByMint({ mintAddress: mintPubkey });
+        console.log("Found NFT:", nft);
         
-        setFormData(prev => ({
-          ...prev,
-          name: nft.name || '',
-          symbol: nft.symbol || '',
-          description: metadata.description || '',
-          imageUrl: metadata.image || '',
-          website: metadata.external_url || metadata.links?.website || '',
-          twitter: metadata.links?.twitter || '',
-          telegram: metadata.links?.telegram || '',
-          github: metadata.links?.github || ''
-        }));
-
+        if (nft.uri) {
+          try {
+            const response = await fetch(nft.uri);
+            const metadata = await response.json();
+            console.log("Metadata from URI:", metadata);
+            
+            setFormData(prev => ({
+              ...prev,
+              name: nft.name || '',
+              symbol: nft.symbol || '',
+              description: metadata.description || '',
+              imageUrl: metadata.image || '',
+              website: metadata.external_url || metadata.links?.website || '',
+              twitter: metadata.links?.twitter || '',
+              telegram: metadata.links?.telegram || '',
+              github: metadata.links?.github || ''
+            }));
+          } catch (uriError) {
+            console.warn("Error loading metadata URI:", uriError);
+            setFormData(prev => ({
+              ...prev,
+              name: nft.name || '',
+              symbol: nft.symbol || ''
+            }));
+          }
+        }
+        
         setStatus(prev => ({
           ...prev,
           message: "Current metadata loaded successfully.",
           error: null
         }));
+      } else {
+        setMetadataExists(false);
+        setStatus(prev => ({
+          ...prev,
+          message: "No metadata found for this token. You can create new metadata.",
+          error: null
+        }));
       }
     } catch (error) {
-      console.log("No metadata found or error loading:", error);
+      console.error("Error in loadCurrentMetadata:", error);
+      setStatus(prev => ({
+        ...prev,
+        error: error.message
+      }));
     }
   };
 
@@ -235,9 +285,11 @@ function UpdateMetadataForm() {
     }
   };
 
+  //////////////// INICIO DO handleUpdateMetadata 
+
+
   const handleUpdateMetadata = async (e) => {
     e.preventDefault();
-
     if (!publicKey || !status.feeConfirmed) {
       setStatus(prev => ({
         ...prev,
@@ -246,35 +298,41 @@ function UpdateMetadataForm() {
       }));
       return;
     }
-
+  
     try {
-      setStatus(prev => ({ 
-        ...prev, 
-        loading: true, 
-        message: "Preparing metadata update...", 
+      setStatus(prev => ({
+        ...prev,
+        loading: true,
+        message: "Checking token details...",
         error: null,
-        progress: 60
+        progress: 30
       }));
-
+  
+      const mintPubkey = new PublicKey(formData.mintAddress);
       const metaplex = new Metaplex(connection);
       metaplex.use(walletAdapterIdentity(wallet));
-
-      const mintPubkey = new PublicKey(formData.mintAddress);
-      
-      const metadataJson = {
+  
+      // Verificar informações da conta
+      const accountInfo = await connection.getAccountInfo(mintPubkey);
+      if (!accountInfo) {
+        throw new Error("Token account not found. Verify the address.");
+      }
+  
+      // Preparar metadados para upload
+      const metadata = {
         name: formData.name,
         symbol: formData.symbol,
         description: formData.description,
         image: formData.imageUrl,
         external_url: formData.website,
         properties: {
-          files: [
+          files: formData.imageUrl ? [
             {
               uri: formData.imageUrl,
               type: "image/png"
             }
-          ],
-          category: "image",
+          ] : [],
+          category: formData.imageUrl ? "image" : "text",
         },
         links: {
           website: formData.website || null,
@@ -283,42 +341,40 @@ function UpdateMetadataForm() {
           github: formData.github || null,
         }
       };
-
-      setStatus(prev => ({ 
-        ...prev,
-        message: "Uploading metadata...",
-        progress: 80
-      }));
-
-      const { uri } = await metaplex.nfts().uploadMetadata(metadataJson);
-
-      setStatus(prev => ({ 
-        ...prev,
-        message: "Updating token metadata...",
-        progress: 90
-      }));
-
-      const nft = await metaplex.nfts().findByMint({ mintAddress: mintPubkey });
-      await metaplex.nfts().update({
-        nftOrSft: nft,
+  
+      // Upload de metadados
+      const { uri } = await metaplex.nfts().uploadMetadata(metadata);
+      console.log("Uploaded Metadata URI:", uri);
+  
+      // Tentar criar metadados
+      const createMetadataResponse = await metaplex.nfts().create({
+        uri: uri,
         name: formData.name,
         symbol: formData.symbol,
-        uri: uri,
-        sellerFeeBasisPoints: 0,
-      }, { commitment: 'confirmed' });
-
+        mintAddress: mintPubkey,
+        updateAuthority: publicKey,
+        mintAuthority: publicKey,
+        isMutable: true,
+      });
+  
+      console.log("Metadata Creation Response:", createMetadataResponse);
+  
       setStatus({
         loading: false,
-        message: "Token metadata updated successfully!",
+        message: "Token metadata created successfully!",
         error: null,
         feeConfirmed: false,
         progress: 100
       });
-
-      setTimeout(handleReset, 3000);
-
+  
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Detailed Error:', error);
+      
+      // Log detalhado do erro
+      console.log('Error Name:', error.name);
+      console.log('Error Message:', error.message);
+      console.log('Error Stack:', error.stack);
+  
       setStatus(prev => ({
         ...prev,
         loading: false,
@@ -328,6 +384,8 @@ function UpdateMetadataForm() {
       }));
     }
   };
+//////////////// FIM DO handleUpdateMetadata 
+
 
   // Render wallet connection state
   if (!publicKey) {
@@ -351,7 +409,6 @@ function UpdateMetadataForm() {
     );
   }
 
-  // Main form render
   return (
     <div className="w-full">
       <form 
@@ -428,7 +485,7 @@ function UpdateMetadataForm() {
             onChange={handleInputChange}
             placeholder="Updated token description"
             required
-            rows="1"
+            rows="3"
             maxLength={MAX_DESCRIPTION_LENGTH}
             className="w-full rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 py-3 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
           />
@@ -450,151 +507,151 @@ function UpdateMetadataForm() {
               <img
                 src={formData.imageUrl}
                 alt="Token Preview"
-                className="max-h-40 mx-auto rounded-lg"onError={() => setStatus(prev => ({ ...prev, showPreview: false }))}
-                />
-              </div>
-            )}
-          </div>
-  
-          {/* Website - Sempre visível */}
-          <div>
-            <label className="block text-sm text-purple-200 mb-2 flex items-center gap-2">
-              <Globe className="w-4 h-4" /> Website
-            </label>
-            <input
-              type="url"
-              name="website"
-              value={formData.website}
-              onChange={handleInputChange}
-              placeholder="https://yourwebsite.com"
-              className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
-            />
-          </div>
-  
-          {/* Botão expansível para links sociais */}
-          <div className="space-y-4">
-            <button
-              type="button"
-              onClick={() => setShowSocialLinks(!showSocialLinks)}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 transition-all"
-            >
-              <span className="flex items-center gap-2">
-                <LinkIcon className="w-4 h-4" />
-                Social Links
-              </span>
-              {showSocialLinks ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <ChevronDown className="w-4 h-4" />
-              )}
-            </button>
-  
-            {/* Links sociais expansíveis */}
-            {showSocialLinks && (
-              <div className="space-y-4 animate-fadeIn">
-                {/* Twitter */}
-                <div>
-                  <label className="block text-sm text-purple-200 mb-2 flex items-center gap-2">
-                    <Twitter className="w-4 h-4" /> Twitter
-                  </label>
-                  <input
-                    type="url"
-                    name="twitter"
-                    value={formData.twitter}
-                    onChange={handleInputChange}
-                    placeholder="https://twitter.com/yourtoken"
-                    className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
-                  />
-                </div>
-  
-                {/* Telegram */}
-                <div>
-                  <label className="block text-sm text-purple-200 mb-2 flex items-center gap-2">
-                    <Send className="w-4 h-4" /> Telegram
-                  </label>
-                  <input
-                    type="url"
-                    name="telegram"
-                    value={formData.telegram}
-                    onChange={handleInputChange}
-                    placeholder="https://t.me/yourtoken"
-                    className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
-                  />
-                </div>
-  
-                {/* GitHub */}
-                <div>
-                  <label className="block text-sm text-purple-200 mb-2 flex items-center gap-2">
-                    <Github className="w-4 h-4" /> GitHub
-                  </label>
-                  <input
-                    type="url"
-                    name="github"
-                    value={formData.github}
-                    onChange={handleInputChange}
-                    placeholder="https://github.com/yourtoken"
-                    className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-  
-          {/* Cost Estimate */}
-          <div className="rounded-xl bg-[#1D0F35] border border-purple-500/20 p-4">
-            <CostEstimate />
-          </div>
-  
-          {/* Status Messages */}
-          {status.message && (
-            <div className="p-4 rounded-xl bg-[#1D0F35] border border-purple-500/20">
-              <p className="text-yellow-400 text-sm text-center">{status.message}</p>
+                className="max-h-40 mx-auto rounded-lg"
+                onError={() => setStatus(prev => ({ ...prev, showPreview: false }))}
+              />
             </div>
           )}
-  
-          {status.error && (
-            <div className="p-4 rounded-xl bg-[#1D0F35] border border-red-500/20">
-              <p className="text-red-400 text-sm text-center">{status.error}</p>
-            </div>
-          )}
-  
-          {/* Reset Button - Only show when form has data */}
-          {Object.values(formData).some(value => value) && (
-            <button
-              type="button"
-              onClick={handleReset}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-500/20 text-purple-200 hover:bg-purple-500/30 transition-all"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Reset Form
-            </button>
-          )}
-  
-          {/* Submit Button */}
+        </div>
+
+        {/* Website */}
+        <div>
+          <label className="block text-sm text-purple-200 mb-2 flex items-center gap-2">
+            <Globe className="w-4 h-4" /> Website
+          </label>
+          <input
+            type="url"
+            name="website"
+            value={formData.website}
+            onChange={handleInputChange}
+            placeholder="https://yourwebsite.com"
+            className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
+          />
+        </div>
+
+        {/* Social Links Section */}
+        <div className="space-y-4">
           <button
-            type="submit"
-            disabled={status.loading}
-            className="w-full flex items-center justify-center gap-2 h-12 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:from-purple-500 hover:to-pink-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            type="button"
+            onClick={() => setShowSocialLinks(!showSocialLinks)}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 transition-all"
           >
-            {status.loading ? (
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                Processing...
-              </div>
+            <span className="flex items-center gap-2">
+              <LinkIcon className="w-4 h-4" />
+              Social Links
+            </span>
+            {showSocialLinks ? (
+              <ChevronUp className="w-4 h-4" />
             ) : (
-              <>
-                {!status.feeConfirmed ? (
-                  <>Step 1: Confirm Details</>
-                ) : (
-                  <>Step 2: Update Metadata</>
-                )}
-                <ArrowRight className="w-4 h-4" />
-              </>
+              <ChevronDown className="w-4 h-4" />
             )}
           </button>
-        </form>
-      </div>
-    );
-  }
-  
-  export default UpdateMetadataForm;
+
+          {showSocialLinks && (
+            <div className="space-y-4 animate-fadeIn">
+              {/* Twitter */}
+              <div>
+                <label className="block text-sm text-purple-200 mb-2 flex items-center gap-2">
+                  <Twitter className="w-4 h-4" /> Twitter
+                </label>
+                <input
+                  type="url"
+                  name="twitter"
+                  value={formData.twitter}
+                  onChange={handleInputChange}
+                  placeholder="https://twitter.com/yourtoken"
+                  className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
+                />
+              </div>
+
+              {/* Telegram */}
+              <div>
+                <label className="block text-sm text-purple-200 mb-2 flex items-center gap-2">
+                  <Send className="w-4 h-4" /> Telegram
+                </label>
+                <input
+                  type="url"
+                  name="telegram"
+                  value={formData.telegram}
+                  onChange={handleInputChange}
+                  placeholder="https://t.me/yourtoken"
+                  className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
+                />
+              </div>
+
+              {/* GitHub */}
+              <div>
+                <label className="block text-sm text-purple-200 mb-2 flex items-center gap-2">
+                  <Github className="w-4 h-4" /> GitHub
+                </label>
+                <input
+                  type="url"
+                  name="github"
+                  value={formData.github}
+                  onChange={handleInputChange}
+                  placeholder="https://github.com/yourtoken"
+                  className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Cost Estimate */}
+        <div className="rounded-xl bg-[#1D0F35] border border-purple-500/20 p-4">
+          <CostEstimate />
+        </div>
+
+        {/* Status Messages */}
+        {status.message && (
+          <div className="p-4 rounded-xl bg-[#1D0F35] border border-purple-500/20">
+            <p className="text-yellow-400 text-sm text-center">{status.message}</p>
+          </div>
+        )}
+
+        {status.error && (
+          <div className="p-4 rounded-xl bg-[#1D0F35] border border-red-500/20">
+            <p className="text-red-400 text-sm text-center">{status.error}</p>
+          </div>
+        )}
+
+        {/* Reset Button */}
+        {Object.values(formData).some(value => value) && (
+          <button
+            type="button"
+            onClick={handleReset}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-500/20 text-purple-200 hover:bg-purple-500/30 transition-all"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Reset Form
+          </button>
+        )}
+
+        {/* Submit Button */}
+        <button
+          type="submit"
+          disabled={status.loading}
+          className="w-full flex items-center justify-center gap-2 h-12 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:from-purple-500 hover:to-pink-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {status.loading ? (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+              Processing...
+            </div>
+          ) : (
+            <>
+              {!status.feeConfirmed ? (
+                <>Step 1: Confirm Details</>
+              ) : (
+                <>Step 2: Update Metadata</>
+              )}
+              <ArrowRight className="w-4 h-4" />
+            </>
+          )}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+export default UpdateMetadataForm;
