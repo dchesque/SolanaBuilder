@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { 
-  ArrowRight, 
-  Edit2, 
-  Globe, 
-  Twitter, 
-  Github, 
+import {
+  ArrowRight,
+  Globe,
+  Twitter,
+  Github,
   Send,
   Wallet,
   RotateCcw,
@@ -12,19 +11,12 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import { 
-  getAssociatedTokenAddress, 
-  TOKEN_PROGRAM_ID 
-} from "@solana/spl-token";
-import { useConnection } from "@solana/wallet-adapter-react";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { 
-  Transaction, 
-  SystemProgram, 
-  PublicKey,
-  ComputeBudgetProgram 
-} from "@solana/web3.js";
+import { Transaction, SystemProgram, PublicKey } from "@solana/web3.js";
+import { SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Metaplex, walletAdapterIdentity } from "@metaplex-foundation/js";
+import { createCreateMetadataAccountV3Instruction } from "@metaplex-foundation/mpl-token-metadata";
 import CostEstimate from "./CostEstimate";
 import WalletConnect from "./WalletConnect";
 
@@ -33,6 +25,42 @@ const SERVICE_FEE = parseFloat(process.env.REACT_APP_SERVICE_FEE);
 const MAX_DESCRIPTION_LENGTH = 1000;
 const MAX_NAME_LENGTH = 32;
 const MAX_SYMBOL_LENGTH = 10;
+const TOKEN_METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+
+// Função para logging detalhado
+const logWithDetails = (message, data = null) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${message}`);
+  if (data) {
+    console.log('Dados:', JSON.stringify(data, null, 2));
+  }
+};
+
+// Função utilitária para tentar uma operação com backoff exponencial
+const retryOperation = async (operation, maxRetries = 3, baseDelay = 1000) => {
+  let lastError;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      logWithDetails(`Tentativa ${attempt + 1} de ${maxRetries}`);
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const delay = baseDelay * Math.pow(2, attempt);
+      logWithDetails(`Tentativa ${attempt + 1} falhou. Tentando novamente em ${delay}ms...`, error);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  throw lastError;
+};
+
+// Função utilitária para verificar se os metadados mudaram
+const hasMetadataChanged = (currentMetadata, newMetadata) => {
+  return (
+    currentMetadata.name !== newMetadata.name ||
+    currentMetadata.symbol !== newMetadata.symbol ||
+    currentMetadata.uri !== newMetadata.uri
+  );
+};
 
 function UpdateMetadataForm() {
   const { connection } = useConnection();
@@ -41,7 +69,6 @@ function UpdateMetadataForm() {
 
   const [showSocialLinks, setShowSocialLinks] = useState(false);
   const [metadataExists, setMetadataExists] = useState(false);
-
   const [formData, setFormData] = useState({
     mintAddress: "",
     name: "",
@@ -53,7 +80,6 @@ function UpdateMetadataForm() {
     telegram: "",
     github: ""
   });
-
   const [status, setStatus] = useState({
     loading: false,
     message: "",
@@ -63,25 +89,28 @@ function UpdateMetadataForm() {
     showPreview: false
   });
 
+  // Carrega o mint address a partir dos parâmetros da URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const tokenAddress = urlParams.get('tokenAddress');
+    const tokenAddress = urlParams.get("tokenAddress");
     if (tokenAddress) {
-      setFormData(prev => ({ ...prev, mintAddress: tokenAddress }));
+      setFormData((prev) => ({ ...prev, mintAddress: tokenAddress }));
     }
   }, []);
 
+  // Ao alterar o mintAddress, carrega os metadados atuais
   useEffect(() => {
     if (formData.mintAddress) {
       loadCurrentMetadata(formData.mintAddress);
     }
   }, [formData.mintAddress]);
 
+  // Exibe a preview da imagem se a URL for válida
   useEffect(() => {
     if (formData.imageUrl && validateUrl(formData.imageUrl)) {
-      setStatus(prev => ({ ...prev, showPreview: true }));
+      setStatus((prev) => ({ ...prev, showPreview: true }));
     } else {
-      setStatus(prev => ({ ...prev, showPreview: false }));
+      setStatus((prev) => ({ ...prev, showPreview: false }));
     }
   }, [formData.imageUrl]);
 
@@ -89,7 +118,7 @@ function UpdateMetadataForm() {
     if (!url) return true;
     try {
       const parsedUrl = new URL(url);
-      return ['http:', 'https:'].includes(parsedUrl.protocol);
+      return ["http:", "https:"].includes(parsedUrl.protocol);
     } catch {
       return false;
     }
@@ -97,34 +126,33 @@ function UpdateMetadataForm() {
 
   const handleInputChange = (e) => {
     if (status.feeConfirmed) return;
-    
     const { name, value } = e.target;
-    
+
+    // Limitar tamanho dos campos
     switch (name) {
-      case 'name':
+      case "name":
         if (value.length > MAX_NAME_LENGTH) return;
         break;
-      case 'symbol':
+      case "symbol":
         if (value.length > MAX_SYMBOL_LENGTH) return;
         break;
-      case 'description':
+      case "description":
         if (value.length > MAX_DESCRIPTION_LENGTH) return;
         break;
+      default:
+        break;
     }
-    
-    setFormData(prev => ({
+
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const handleReset = () => {
-    if (status.loading) {
-      if (!window.confirm('Uma operação está em andamento. Deseja realmente resetar?')) {
-        return;
-      }
+    if (status.loading && !window.confirm("Uma operação está em andamento. Deseja realmente resetar?")) {
+      return;
     }
-    
     setFormData({
       mintAddress: "",
       name: "",
@@ -150,75 +178,78 @@ function UpdateMetadataForm() {
 
   const loadCurrentMetadata = async (mintAddress) => {
     try {
+      logWithDetails('Iniciando carregamento de metadados para:', mintAddress);
       const mintPubkey = new PublicKey(mintAddress);
       const metaplex = new Metaplex(connection);
       metaplex.use(walletAdapterIdentity(wallet));
-      
-      // Primeiro, verificar se o token existe
-      try {
-        const mintInfo = await connection.getAccountInfo(mintPubkey);
-        if (!mintInfo) {
-          throw new Error("Token not found");
-        }
-      } catch (error) {
-        console.error("Error checking mint:", error);
-        throw new Error("Invalid token address");
+
+      // Verifica se o token existe
+      const mintInfo = await connection.getAccountInfo(mintPubkey);
+      if (!mintInfo) {
+        throw new Error("Token não encontrado");
       }
-      
-      // Tentar carregar os metadados existentes
+      logWithDetails('Informações do token encontradas:', mintInfo);
+
+      // Verifica se é um token SPL válido
+      if (!mintInfo.owner.equals(TOKEN_PROGRAM_ID)) {
+        throw new Error("Token inválido: não é um token SPL");
+      }
+
+      // Tenta carregar os metadados existentes
       const pda = metaplex.nfts().pdas().metadata({ mint: mintPubkey });
       const metadataAccount = await connection.getAccountInfo(pda);
-      
+      logWithDetails('Conta de metadados:', metadataAccount);
+
       if (metadataAccount) {
         setMetadataExists(true);
         const nft = await metaplex.nfts().findByMint({ mintAddress: mintPubkey });
-        console.log("Found NFT:", nft);
-        
+        logWithDetails('NFT encontrado:', nft);
+
         if (nft.uri) {
           try {
             const response = await fetch(nft.uri);
             const metadata = await response.json();
-            console.log("Metadata from URI:", metadata);
+            logWithDetails('Metadados do URI:', metadata);
             
-            setFormData(prev => ({
+            setFormData((prev) => ({
               ...prev,
-              name: nft.name || '',
-              symbol: nft.symbol || '',
-              description: metadata.description || '',
-              imageUrl: metadata.image || '',
-              website: metadata.external_url || metadata.links?.website || '',
-              twitter: metadata.links?.twitter || '',
-              telegram: metadata.links?.telegram || '',
-              github: metadata.links?.github || ''
+              name: nft.name || "",
+              symbol: nft.symbol || "",
+              description: metadata.description || "",
+              imageUrl: metadata.image || "",
+              website: metadata.external_url || metadata.links?.website || "",
+              twitter: metadata.links?.twitter || "",
+              telegram: metadata.links?.telegram || "",
+              github: metadata.links?.github || ""
             }));
           } catch (uriError) {
-            console.warn("Error loading metadata URI:", uriError);
-            setFormData(prev => ({
+            logWithDetails('Erro ao carregar o URI dos metadados:', uriError);
+            setFormData((prev) => ({
               ...prev,
-              name: nft.name || '',
-              symbol: nft.symbol || ''
+              name: nft.name || "",
+              symbol: nft.symbol || ""
             }));
           }
         }
-        
-        setStatus(prev => ({
+
+        setStatus((prev) => ({
           ...prev,
-          message: "Current metadata loaded successfully.",
+          message: "Metadados atuais carregados com sucesso.",
           error: null
         }));
       } else {
         setMetadataExists(false);
-        setStatus(prev => ({
+        setStatus((prev) => ({
           ...prev,
-          message: "No metadata found for this token. You can create new metadata.",
+          message: "Nenhum metadado encontrado para este token. Você pode criar novos metadados.",
           error: null
         }));
       }
     } catch (error) {
-      console.error("Error in loadCurrentMetadata:", error);
-      setStatus(prev => ({
+      logWithDetails('Erro em loadCurrentMetadata:', error);
+      setStatus((prev) => ({
         ...prev,
-        error: error.message
+        error: `Erro ao carregar metadados: ${error.message}`
       }));
     }
   };
@@ -226,32 +257,44 @@ function UpdateMetadataForm() {
   const handleConfirmDetails = async (e) => {
     e.preventDefault();
     
-    if (!publicKey) {
-      setStatus(prev => ({
-        ...prev,
-        message: "Please connect your wallet to continue.",
-        error: null
-      }));
-      return;
-    }
-
-    if (!formData.mintAddress) {
-      setStatus(prev => ({
-        ...prev,
-        error: "Token address is required"
-      }));
-      return;
-    }
-
     try {
-      setStatus(prev => ({ 
+      if (!publicKey) {
+        setStatus((prev) => ({
+          ...prev,
+          message: "Por favor, conecte sua carteira para continuar.",
+          error: null
+        }));
+        return;
+      }
+  
+      if (!formData.mintAddress) {
+        setStatus((prev) => ({
+          ...prev,
+          error: "O endereço do token é obrigatório"
+        }));
+        return;
+      }
+  
+      // Verifica o saldo da carteira antes de prosseguir
+      const balance = await connection.getBalance(publicKey);
+const requiredBalance = SERVICE_FEE * 1e9; // Apenas a taxa de serviço
+if (balance < requiredBalance) {
+  setStatus((prev) => ({
+    ...prev,
+    error: `Saldo insuficiente. Você precisa de pelo menos ${(requiredBalance / 1e9).toFixed(4)} SOL na sua carteira.`
+  }));
+  return;
+}
+  
+      setStatus((prev) => ({ 
         ...prev, 
         loading: true, 
-        message: "Processing service fee...", 
+        message: "Processando taxa de serviço...", 
         error: null,
         progress: 25
       }));
-
+  
+      // Criar a transação
       const transaction = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: publicKey,
@@ -259,150 +302,266 @@ function UpdateMetadataForm() {
           lamports: SERVICE_FEE * 1e9,
         })
       );
-
+  
+      // Configurar a transação
       transaction.feePayer = publicKey;
-      transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
+      const blockhash = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash.blockhash;
+  
+      // Enviar a transação
+      logWithDetails('Enviando transação de taxa de serviço');
       const signature = await sendTransaction(transaction, connection);
-      await connection.confirmTransaction(signature, "confirmed");
-
-      setStatus({
+      logWithDetails('Taxa de serviço - Assinatura da transação:', signature);
+  
+      // Aguardar confirmação com retry
+      let confirmed = false;
+      for (let i = 0; i < 3; i++) {
+        try {
+          await connection.confirmTransaction({
+            signature,
+            blockhash: blockhash.blockhash,
+            lastValidBlockHeight: blockhash.lastValidBlockHeight
+          }, 'confirmed');
+          confirmed = true;
+          break;
+        } catch (err) {
+          logWithDetails(`Tentativa ${i + 1} de confirmar transação falhou:`, err);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+  
+      if (!confirmed) {
+        throw new Error("Não foi possível confirmar a transação após várias tentativas");
+      }
+  
+      logWithDetails('Taxa de serviço confirmada');
+  
+      setStatus((prev) => ({
+        ...prev,
         loading: false,
-        message: "Service fee confirmed. You can now update your token's metadata.",
+        message: "Taxa de serviço confirmada. Agora você pode atualizar os metadados do token.",
         error: null,
         feeConfirmed: true,
         progress: 50
-      });
+      }));
+  
     } catch (err) {
-      console.error(err);
-      setStatus(prev => ({
+      logWithDetails('Erro ao processar taxa de serviço:', err);
+      
+      let errorMessage = "Erro ao processar a taxa de serviço: ";
+      
+      if (err.message?.includes("User rejected")) {
+        errorMessage += "Transação rejeitada pelo usuário.";
+      } else if (err.InsufficientFundsForRent) {
+        errorMessage += "Saldo insuficiente para cobrir o rent da conta.";
+      } else {
+        errorMessage += err.message || "Erro desconhecido";
+      }
+  
+      setStatus((prev) => ({
         ...prev,
         loading: false,
         message: "",
-        error: "Error processing service fee: " + err.message,
+        error: errorMessage,
         progress: 0
       }));
     }
   };
 
-  //////////////// INICIO DO handleUpdateMetadata 
-
-
   const handleUpdateMetadata = async (e) => {
     e.preventDefault();
-    if (!publicKey || !status.feeConfirmed) {
-      setStatus(prev => ({
-        ...prev,
-        message: "Please complete Step 1 first.",
-        error: null
-      }));
-      return;
-    }
-  
     try {
-      setStatus(prev => ({
-        ...prev,
-        loading: true,
-        message: "Checking token details...",
-        error: null,
-        progress: 30
-      }));
+      if (!publicKey) {
+        throw new Error("Carteira não conectada. Por favor, conecte sua carteira.");
+      }
+      if (!formData.mintAddress) {
+        throw new Error("O endereço do token é obrigatório");
+      }
+      if (!formData.name || !formData.symbol) {
+        throw new Error("Nome e símbolo do token são obrigatórios");
+      }
+  
+      logWithDetails(
+        "Iniciando processo de atualização/criação de metadados para token fungível SPL com 9 decimais",
+        formData
+      );
   
       const mintPubkey = new PublicKey(formData.mintAddress);
       const metaplex = new Metaplex(connection);
       metaplex.use(walletAdapterIdentity(wallet));
   
-      // Verificar informações da conta
-      const accountInfo = await connection.getAccountInfo(mintPubkey);
-      if (!accountInfo) {
-        throw new Error("Token account not found. Verify the address.");
+      // Verifica se o token existe e se é um token SPL
+      const mintInfo = await connection.getAccountInfo(mintPubkey);
+      if (!mintInfo) {
+        throw new Error("Token não encontrado");
       }
+      if (!mintInfo.owner.equals(TOKEN_PROGRAM_ID)) {
+        throw new Error("Token inválido: não é um token SPL");
+      }
+      logWithDetails("Token validado:", mintInfo);
   
-      // Preparar metadados para upload
-      const metadata = {
+      // Prepara o JSON de metadados
+      const metadataJson = {
         name: formData.name,
         symbol: formData.symbol,
         description: formData.description,
         image: formData.imageUrl,
         external_url: formData.website,
         properties: {
-          files: formData.imageUrl ? [
-            {
-              uri: formData.imageUrl,
-              type: "image/png"
-            }
-          ] : [],
-          category: formData.imageUrl ? "image" : "text",
+          files: formData.imageUrl
+            ? [
+                {
+                  uri: formData.imageUrl,
+                  type: "image/png",
+                },
+              ]
+            : [],
+          category: "image",
         },
         links: {
           website: formData.website || null,
           twitter: formData.twitter || null,
           telegram: formData.telegram || null,
           github: formData.github || null,
-        }
+        },
       };
   
-      // Upload de metadados
-      const { uri } = await metaplex.nfts().uploadMetadata(metadata);
-      console.log("Uploaded Metadata URI:", uri);
+      setStatus((prev) => ({
+        ...prev,
+        loading: true,
+        message: "Fazendo upload dos metadados...",
+        progress: 70,
+      }));
   
-      // Tentar criar metadados
-      const createMetadataResponse = await metaplex.nfts().create({
-        uri: uri,
-        name: formData.name,
-        symbol: formData.symbol,
-        mintAddress: mintPubkey,
-        updateAuthority: publicKey,
-        mintAuthority: publicKey,
-        isMutable: true,
+      const { uri } = await retryOperation(async () => {
+        logWithDetails("Iniciando upload de metadados");
+        return await metaplex.nfts().uploadMetadata(metadataJson);
       });
+      logWithDetails("Upload de metadados concluído. URI:", uri);
   
-      console.log("Metadata Creation Response:", createMetadataResponse);
+      // Tenta carregar os metadados atuais
+      let currentMetadata;
+      try {
+        currentMetadata = await metaplex.nfts().findByMint({ mintAddress: mintPubkey });
+        logWithDetails("Metadados atuais encontrados:", currentMetadata);
+      } catch (err) {
+        logWithDetails("Nenhum metadado encontrado, preparando para criar novos metadados");
+      }
   
-      setStatus({
+      setStatus((prev) => ({
+        ...prev,
+        message: currentMetadata ? "Atualizando metadados..." : "Criando novos metadados...",
+        progress: 85,
+      }));
+  
+      if (!currentMetadata) {
+        // Criação de metadados para token fungível: sempre usar createSft()
+        logWithDetails(
+          "Nenhum metadado encontrado. Criando metadados via metaplex.nfts().createSft()"
+        );
+        let newSft;
+        try {
+          newSft = await metaplex.nfts().createSft({
+            useNewMint: false,
+            tokenExists: true,
+            tokenOwner: publicKey,
+            payer: publicKey,
+            mintAuthority: publicKey,
+            updateAuthority: publicKey,
+            mintAddress: mintPubkey,
+            name: formData.name,
+            symbol: formData.symbol,
+            uri: uri,
+            sellerFeeBasisPoints: 0,
+            isMutable: true,
+          });
+          logWithDetails("SFT criado com metadados:", newSft);
+          setStatus((prev) => ({
+            ...prev,
+            loading: false,
+            message: "Metadados criados com sucesso!",
+            error: null,
+            feeConfirmed: false,
+            progress: 100,
+          }));
+          return { signature: newSft.response.signature };
+        } catch (error) {
+          logWithDetails("Erro na criação de SFT:", error);
+          throw new Error("Falha ao criar metadados: " + error.message);
+        }
+      } else {
+        // Fluxo de atualização para tokens que já possuem metadados
+        logWithDetails("Iniciando atualização de metadados existentes");
+        const updateResponse = await retryOperation(async () => {
+          return await metaplex.nfts().update(
+            {
+              nftOrSft: currentMetadata,
+              name: formData.name,
+              symbol: formData.symbol,
+              uri: uri,
+              sellerFeeBasisPoints: currentMetadata.sellerFeeBasisPoints,
+              creators: currentMetadata.creators,
+              isMutable: true,
+              primarySaleHappened: currentMetadata.primarySaleHappened,
+              collection: currentMetadata.collection,
+            },
+            { commitment: "confirmed" }
+          );
+        });
+        logWithDetails("Resposta da atualização:", updateResponse);
+        await connection.confirmTransaction(updateResponse.response.signature, "confirmed");
+        logWithDetails("Transação de atualização confirmada");
+      }
+  
+      setStatus((prev) => ({
+        ...prev,
         loading: false,
-        message: "Token metadata created successfully!",
+        message: `Metadados do token atualizados com sucesso!`,
         error: null,
         feeConfirmed: false,
-        progress: 100
-      });
+        progress: 100,
+      }));
   
+      setTimeout(() => {
+        handleReset();
+      }, 3000);
     } catch (error) {
-      console.error('Detailed Error:', error);
-      
-      // Log detalhado do erro
-      console.log('Error Name:', error.name);
-      console.log('Error Message:', error.message);
-      console.log('Error Stack:', error.stack);
-  
-      setStatus(prev => ({
+      logWithDetails("Erro durante o processo:", error);
+      let errorMessage = "Erro ao atualizar metadados: " + error.message;
+      if (error.message.includes("Not enough accounts")) {
+        errorMessage =
+          "Erro: Conta de metadados não encontrada. Verifique se o token foi criado corretamente.";
+      } else if (error.message.includes("Invalid authority")) {
+        errorMessage = "Erro: Você não tem autoridade para modificar este token.";
+      } else if (error.message.includes("Unable to serialize")) {
+        errorMessage =
+          "Erro: Dados inválidos nos metadados. Verifique os campos preenchidos.";
+      }
+      setStatus((prev) => ({
         ...prev,
         loading: false,
         message: "",
-        error: `Error updating metadata: ${error.message}`,
-        progress: 0
+        error: errorMessage,
+        progress: 0,
       }));
     }
   };
-//////////////// FIM DO handleUpdateMetadata 
+  
 
-
-  // Render wallet connection state
+  // Se a carteira não estiver conectada, exibe o componente de conexão
   if (!publicKey) {
     return (
       <div className="w-full">
         <h2 className="text-2xl font-bold text-center mb-4 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-          Connect Your Wallet
+          Conecte sua Carteira
         </h2>
         <p className="text-center text-sm text-purple-200/80 mb-8">
-          Connect your Solana wallet to update your token's information.
+          Conecte sua carteira Solana para atualizar as informações do seu token.
         </p>
-        
         <div className="flex flex-col items-center gap-6">
           <div className="w-16 h-16 rounded-full bg-purple-500/10 flex items-center justify-center">
             <Wallet className="w-8 h-8 text-purple-400" />
           </div>
-          
           <WalletConnect className="w-full px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:from-purple-500 hover:to-pink-500 transition-all duration-300 shadow-lg shadow-purple-500/25" />
         </div>
       </div>
@@ -415,7 +574,7 @@ function UpdateMetadataForm() {
         onSubmit={!status.feeConfirmed ? handleConfirmDetails : handleUpdateMetadata} 
         className="space-y-6"
       >
-        {/* Token Address */}
+        {/* Token Address (Mint) */}
         <div>
           <label className="block text-sm text-purple-200 mb-2">
             Token Address (Mint) *
@@ -425,7 +584,7 @@ function UpdateMetadataForm() {
             name="mintAddress"
             value={formData.mintAddress}
             onChange={handleInputChange}
-            placeholder="Enter your token's address"
+            placeholder="Digite o endereço do seu token"
             required
             className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
           />
@@ -444,7 +603,7 @@ function UpdateMetadataForm() {
             name="name"
             value={formData.name}
             onChange={handleInputChange}
-            placeholder="Updated token name"
+            placeholder="Nome atualizado do token"
             required
             maxLength={MAX_NAME_LENGTH}
             className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
@@ -464,7 +623,7 @@ function UpdateMetadataForm() {
             name="symbol"
             value={formData.symbol}
             onChange={handleInputChange}
-            placeholder="Updated token symbol"
+            placeholder="Símbolo atualizado do token"
             required
             maxLength={MAX_SYMBOL_LENGTH}
             className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
@@ -483,7 +642,7 @@ function UpdateMetadataForm() {
             name="description"
             value={formData.description}
             onChange={handleInputChange}
-            placeholder="Updated token description"
+            placeholder="Descrição atualizada do token"
             required
             rows="3"
             maxLength={MAX_DESCRIPTION_LENGTH}
@@ -491,7 +650,7 @@ function UpdateMetadataForm() {
           />
         </div>
 
-        {/* Image URL */}
+        {/* Token Image URL */}
         <div>
           <label className="block text-sm text-purple-200 mb-2">Token Image URL</label>
           <input
@@ -499,7 +658,7 @@ function UpdateMetadataForm() {
             name="imageUrl"
             value={formData.imageUrl}
             onChange={handleInputChange}
-            placeholder="https://example.com/image.png"
+            placeholder="https://exemplo.com/imagem.png"
             className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
           />
           {status.showPreview && (
@@ -508,7 +667,7 @@ function UpdateMetadataForm() {
                 src={formData.imageUrl}
                 alt="Token Preview"
                 className="max-h-40 mx-auto rounded-lg"
-                onError={() => setStatus(prev => ({ ...prev, showPreview: false }))}
+                onError={() => setStatus((prev) => ({ ...prev, showPreview: false }))}
               />
             </div>
           )}
@@ -524,12 +683,12 @@ function UpdateMetadataForm() {
             name="website"
             value={formData.website}
             onChange={handleInputChange}
-            placeholder="https://yourwebsite.com"
+            placeholder="https://seusite.com"
             className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
           />
         </div>
 
-        {/* Social Links Section */}
+        {/* Sessão de Links Sociais */}
         <div className="space-y-4">
           <button
             type="button"
@@ -546,7 +705,6 @@ function UpdateMetadataForm() {
               <ChevronDown className="w-4 h-4" />
             )}
           </button>
-
           {showSocialLinks && (
             <div className="space-y-4 animate-fadeIn">
               {/* Twitter */}
@@ -559,11 +717,10 @@ function UpdateMetadataForm() {
                   name="twitter"
                   value={formData.twitter}
                   onChange={handleInputChange}
-                  placeholder="https://twitter.com/yourtoken"
+                  placeholder="https://twitter.com/seutoken"
                   className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
                 />
               </div>
-
               {/* Telegram */}
               <div>
                 <label className="block text-sm text-purple-200 mb-2 flex items-center gap-2">
@@ -574,11 +731,10 @@ function UpdateMetadataForm() {
                   name="telegram"
                   value={formData.telegram}
                   onChange={handleInputChange}
-                  placeholder="https://t.me/yourtoken"
+                  placeholder="https://t.me/seutoken"
                   className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
                 />
               </div>
-
               {/* GitHub */}
               <div>
                 <label className="block text-sm text-purple-200 mb-2 flex items-center gap-2">
@@ -589,7 +745,7 @@ function UpdateMetadataForm() {
                   name="github"
                   value={formData.github}
                   onChange={handleInputChange}
-                  placeholder="https://github.com/yourtoken"
+                  placeholder="https://github.com/seutoken"
                   className="w-full h-12 rounded-xl bg-[#1D0F35] border border-purple-500/20 px-4 text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
                 />
               </div>
@@ -597,26 +753,25 @@ function UpdateMetadataForm() {
           )}
         </div>
 
-        {/* Cost Estimate */}
+        {/* Estimativa de Custo */}
         <div className="rounded-xl bg-[#1D0F35] border border-purple-500/20 p-4">
           <CostEstimate />
         </div>
 
-        {/* Status Messages */}
+        {/* Mensagens de Status */}
         {status.message && (
           <div className="p-4 rounded-xl bg-[#1D0F35] border border-purple-500/20">
             <p className="text-yellow-400 text-sm text-center">{status.message}</p>
           </div>
         )}
-
         {status.error && (
           <div className="p-4 rounded-xl bg-[#1D0F35] border border-red-500/20">
             <p className="text-red-400 text-sm text-center">{status.error}</p>
           </div>
         )}
 
-        {/* Reset Button */}
-        {Object.values(formData).some(value => value) && (
+        {/* Botão de Reset */}
+        {Object.values(formData).some((value) => value) && (
           <button
             type="button"
             onClick={handleReset}
@@ -627,7 +782,7 @@ function UpdateMetadataForm() {
           </button>
         )}
 
-        {/* Submit Button */}
+        {/* Botão de Submit */}
         <button
           type="submit"
           disabled={status.loading}
@@ -636,14 +791,14 @@ function UpdateMetadataForm() {
           {status.loading ? (
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-              Processing...
+              Processando...
             </div>
           ) : (
             <>
               {!status.feeConfirmed ? (
-                <>Step 1: Confirm Details</>
+                <>Step 1: Confirmar Detalhes</>
               ) : (
-                <>Step 2: Update Metadata</>
+                <>Step 2: Atualizar Metadados</>
               )}
               <ArrowRight className="w-4 h-4" />
             </>

@@ -123,7 +123,7 @@ export default function TokenCreatorPage() {
                 Turn your idea into reality instantly. Customize, deploy, and dominate the market—effortless and powerful! 🚀
               </p>
 
-              {/* Stats */}
+               {/* BLOCO STATS
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">
                 <div className="group bg-purple-900/10 backdrop-blur-sm px-2 py-1.5 rounded-lg hover:bg-purple-900/20 transition-all duration-300 border border-purple-500/10 hover:border-purple-500/20">
                   <div className="text-lg font-bold bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent group-hover:scale-105 transform transition-all">
@@ -143,6 +143,7 @@ export default function TokenCreatorPage() {
                   </div>
                 </div>
               </div>
+              */}
 
               {/* Mini Tutorial */}
               <div className="space-y-1 mb-2">
