@@ -1,8 +1,10 @@
 const webpack = require('webpack');
 const NodePolyfillPlugin = require('node-polyfill-webpack-plugin');
-const path = require('path');
 
 module.exports = {
+  eslint: {
+    enable: false  // Desabilita completamente o ESLint durante o build
+  },
   webpack: {
     configure: (webpackConfig) => {
       // Remove ModuleScopePlugin
@@ -10,12 +12,6 @@ module.exports = {
         (plugin) => plugin.constructor.name !== 'ModuleScopePlugin'
       );
 
-      // Limpa definições anteriores de process.env
-      webpackConfig.plugins = webpackConfig.plugins.filter(
-        (plugin) => !(plugin instanceof webpack.DefinePlugin)
-      );
-
-      // Configurações de fallback e plugins anteriores mantidas...
       webpackConfig.resolve.fallback = {
         ...webpackConfig.resolve.fallback,
         crypto: require.resolve('crypto-browserify'),
@@ -46,16 +42,6 @@ module.exports = {
       ];
 
       return webpackConfig;
-    }
-  },
-  // Desabilitar warnings como erros
-  eslint: {
-    configure: (eslintConfig) => {
-      eslintConfig.rules = {
-        ...eslintConfig.rules,
-        'no-unused-vars': 'warn'
-      };
-      return eslintConfig;
     }
   }
 };

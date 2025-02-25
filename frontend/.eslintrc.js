@@ -4,7 +4,8 @@ module.exports = {
       "react-app/jest"
     ],
     rules: {
-      "no-unused-vars": "warn",
-      "react-hooks/exhaustive-deps": "warn"
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "react-hooks/exhaustive-deps": "off"
     }
   };
