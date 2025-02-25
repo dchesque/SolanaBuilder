@@ -18,7 +18,7 @@ module.exports = {
         buffer: require.resolve('buffer/'),
         console: require.resolve('console-browserify'),
       };
-
+     
       // Configure ModuleScopePlugin to allow imports outside of src
       const moduleScopePlugin = webpackConfig.resolve.plugins.find(
         plugin => plugin.constructor.name === 'ModuleScopePlugin'
@@ -28,18 +28,18 @@ module.exports = {
           plugin => plugin.constructor.name !== 'ModuleScopePlugin'
         );
       }
-
+      
       // Alias configuration
       webpackConfig.resolve.alias = {
         ...webpackConfig.resolve.alias,
         'process/browser': 'process/browser.js'
       };
-
+      
       // Remove any existing DefinePlugin for process.env
       webpackConfig.plugins = webpackConfig.plugins.filter(
         plugin => !(plugin instanceof webpack.DefinePlugin)
       );
-
+      
       // Add plugins
       webpackConfig.plugins.push(
         new webpack.ProvidePlugin({
@@ -54,7 +54,7 @@ module.exports = {
           })
         })
       );
-
+      
       return webpackConfig;
     }
   },
@@ -63,7 +63,9 @@ module.exports = {
   },
   babel: {
     plugins: [
-      '@babel/plugin-transform-private-property-in-object',
+      ['@babel/plugin-transform-private-property-in-object', { loose: true }],
+      ['@babel/plugin-transform-class-properties', { loose: true }],
+      ['@babel/plugin-transform-private-methods', { loose: true }]
     ]
   },
   jest: {
