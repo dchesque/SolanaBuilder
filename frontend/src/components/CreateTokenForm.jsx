@@ -311,141 +311,146 @@ const tokenNameError = validateTokenName(nomeToken);
   };
 
   // STEP 3: Add metadata to the token using Metaplex
-  const handleAddMetadata = async (e) => {
-    e.preventDefault();
+// Updated handleAddMetadata function with explicit rent handling
+const handleAddMetadata = async (e) => {
+  e.preventDefault();
 
-    if (!publicKey || !createdTokenData) {
-      setMessage("Token data not found. Please create the token first.");
-      return;
-    }
+  if (!publicKey || !createdTokenData) {
+    setMessage("Token data not found. Please create the token first.");
+    return;
+  }
 
-    setLoading(true);
-    setMessage("Calculating costs and adding metadata to the token...");
+  setLoading(true);
+  setMessage("Calculating costs and adding metadata to the token...");
 
-    try {
-      // Initialize Metaplex
-      const metaplex = new Metaplex(connection);
-      metaplex.use(walletAdapterIdentity({ publicKey, sendTransaction }));
+  try {
+    // Initialize Metaplex
+    const metaplex = new Metaplex(connection);
+    metaplex.use(walletAdapterIdentity({ publicKey, sendTransaction }));
 
-      console.log('Preparing on-chain metadata creation...');
-      
-      const mintAddress = new PublicKey(createdTokenData.mintAddress);
-      
-      // Find the metadata PDA
-      const metadataPDA = await metaplex.nfts().pdas().metadata({ mint: mintAddress });
-      
-      console.log('Metadata PDA address:', metadataPDA.toBase58());
-      
-      // Prepare data for the metadata instruction
-      const metadataData = {
-        name: createdTokenData.name,
-        symbol: createdTokenData.symbol,
-        uri: "", // Empty URI, not uploading to Arweave
-        sellerFeeBasisPoints: 0,
-        creators: null,
-        collection: null,
-        uses: null
-      };
-      
-      // Estimate the space required for metadata
-      const metadataSize = 1 + // discriminator key
-                       32 + // mintKey
-                       32 + // updateAuthority
-                       createdTokenData.name.length + 4 + // name string (with length prefix)
-                       createdTokenData.symbol.length + 4 + // symbol string (with length prefix)
-                       4 + // uri string (empty but with length prefix)
-                       2 + // seller fee basis points
-                       1 + // Boolean has creators
-                       1 + // Boolean has collection
-                       1 + // Boolean has uses
-                       1; // extra byte for possible extensions
+    console.log('Preparing on-chain metadata creation...');
     
-      console.log('Estimated metadata size (bytes):', metadataSize);
-      
-      // Calculate rent cost for the metadata size
-      const rentExemptionAmount = await connection.getMinimumBalanceForRentExemption(metadataSize);
-      
-      console.log('Rent exemption cost (lamports):', rentExemptionAmount);
-      console.log('Rent exemption cost (SOL):', rentExemptionAmount / 1_000_000_000);
-      
-      // Create metadata instruction
-      const createMetadataInstruction = createCreateMetadataAccountV3Instruction(
-        {
-          metadata: metadataPDA,
-          mint: mintAddress,
-          mintAuthority: publicKey,
-          payer: publicKey,
-          updateAuthority: publicKey,
-        },
-        {
-          createMetadataAccountArgsV3: {
-            data: metadataData,
-            isMutable: true,
-            collectionDetails: null
-          }
+    const mintAddress = new PublicKey(createdTokenData.mintAddress);
+    
+    // Find the metadata PDA
+    const metadataPDA = await metaplex.nfts().pdas().metadata({ mint: mintAddress });
+    
+    console.log('Metadata PDA address:', metadataPDA.toBase58());
+    
+    // Prepare data for the metadata instruction
+    const metadataData = {
+      name: createdTokenData.name,
+      symbol: createdTokenData.symbol,
+      uri: "", // Empty URI, not uploading to Arweave
+      sellerFeeBasisPoints: 0,
+      creators: null,
+      collection: null,
+      uses: null
+    };
+    
+    // More precise metadata size calculation
+    const metadataSize = 1 + // key
+                     32 + // mint
+                     32 + // update authority
+                     4 + createdTokenData.name.length + // name
+                     4 + createdTokenData.symbol.length + // symbol
+                     4 + // uri
+                     2 + // seller fee
+                     1 + // creators
+                     1 + // collection
+                     1; // uses
+  
+    console.log('Estimated metadata size (bytes):', metadataSize);
+    
+    // Get exact rent exemption amount
+    const rentExemptionAmount = await connection.getMinimumBalanceForRentExemption(metadataSize);
+    
+    console.log('Rent exemption cost (lamports):', rentExemptionAmount);
+    console.log('Rent exemption cost (SOL):', rentExemptionAmount / 1_000_000_000);
+    
+    // Create a transaction with an explicit transfer for rent
+    const transaction = new Transaction();
+    
+    // Add a system transfer instruction for rent exemption
+    const rentTransferIx = SystemProgram.transfer({
+      fromPubkey: publicKey,
+      toPubkey: metadataPDA, // Transfer rent directly to the metadata account
+      lamports: rentExemptionAmount
+    });
+    transaction.add(rentTransferIx);
+    
+    // Create metadata instruction
+    const createMetadataInstruction = createCreateMetadataAccountV3Instruction(
+      {
+        metadata: metadataPDA,
+        mint: mintAddress,
+        mintAuthority: publicKey,
+        payer: publicKey,
+        updateAuthority: publicKey,
+      },
+      {
+        createMetadataAccountArgsV3: {
+          data: metadataData,
+          isMutable: true,
+          collectionDetails: null
         }
-      );
-      
-      // Create and send the transaction
-      const transaction = new Transaction().add(createMetadataInstruction);
-      
-      transaction.feePayer = publicKey;
-      transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-      
-      // Estimate fees
-      const { feeCalculator } = await connection.getRecentBlockhash();
-      const fees = await transaction.getEstimatedFee(connection);
-      
-      console.log('Estimated transaction fee (lamports):', fees);
-      console.log('Estimated transaction fee (SOL):', fees / 1_000_000_000);
-      
-      console.log('Total estimated cost (SOL):', (rentExemptionAmount + fees) / 1_000_000_000);
-      
-      // Confirm with the user to proceed
-      setMessage(`The total estimated cost is ${((rentExemptionAmount + fees) / 1_000_000_000).toFixed(6)} SOL. Do you want to continue?`);
-      
-      const signature = await sendTransaction(transaction, connection);
-      console.log('Metadata created successfully! Signature:', signature);
-      
-      // Await confirmation
-      await connection.confirmTransaction(signature, "confirmed");
-      
-      // Navigate to token details page
-      navigate("/token-details", {
-        state: {
-          tokenAddress: createdTokenData.mintAddress,
-          tokenName: createdTokenData.name,
-          ticker: createdTokenData.symbol,
-          supply: createdTokenData.supply,
-          decimals: createdTokenData.decimals
-        }
-      });
-
-      setMessage(`Token and metadata created successfully!`);
-    } catch (err) {
-      console.error('Detailed error adding metadata:', err);
-      
-      if (err.message.includes("already has metadata") || err.message.includes("already exists")) {
-        setMessage("It seems metadata already exists. Redirecting to token details page...");
-        
-        setTimeout(() => {
-          navigate("/token-details", {
-            state: {
-              tokenAddress: createdTokenData.mintAddress,
-              tokenName: createdTokenData.name,
-              ticker: createdTokenData.symbol,
-              supply: createdTokenData.supply,
-              decimals: createdTokenData.decimals
-            }
-          });
-        }, 2000);
-      } else {
-        setMessage("Error adding metadata: " + err.message);
       }
-    } finally {
-      setLoading(false);
+    );
+    transaction.add(createMetadataInstruction);
+    
+    transaction.feePayer = publicKey;
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    
+    // Estimate fees
+    const estimatedFees = await transaction.getEstimatedFee(connection);
+    
+    console.log('Total estimated transaction cost (SOL):', 
+      (rentExemptionAmount + estimatedFees) / 1_000_000_000
+    );
+    
+    // Send the transaction
+    const signature = await sendTransaction(transaction, connection);
+    console.log('Metadata created successfully! Signature:', signature);
+    
+    // Await confirmation
+    await connection.confirmTransaction(signature, "confirmed");
+    
+    // Navigate to token details page
+    navigate("/token-details", {
+      state: {
+        tokenAddress: createdTokenData.mintAddress,
+        tokenName: createdTokenData.name,
+        ticker: createdTokenData.symbol,
+        supply: createdTokenData.supply,
+        decimals: createdTokenData.decimals
+      }
+    });
+
+    setMessage(`Token and metadata created successfully!`);
+  } catch (err) {
+    console.error('Detailed error adding metadata:', err);
+    
+    if (err.message.includes("already has metadata") || err.message.includes("already exists")) {
+      setMessage("It seems metadata already exists. Redirecting to token details page...");
+      
+      setTimeout(() => {
+        navigate("/token-details", {
+          state: {
+            tokenAddress: createdTokenData.mintAddress,
+            tokenName: createdTokenData.name,
+            ticker: createdTokenData.symbol,
+            supply: createdTokenData.supply,
+            decimals: createdTokenData.decimals
+          }
+        });
+      }, 2000);
+    } else {
+      setMessage("Error adding metadata: " + err.message);
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Wallet not connected
   if (!publicKey) {
