@@ -1,20 +1,20 @@
 {
-    "version": 2,
-    "builds": [
-      {
-        "src": "api/**/*.js",
-        "use": "@vercel/node"
-      }
-    ],
-    "routes": [
-      { "src": "/create-token", "dest": "/api/create-token.js" },
-      { "src": "/update-metadata", "dest": "/api/update-metadata.js" },
-      { "src": "/rpc", "dest": "/api/rpc.js" },
-      { "src": "/admin/auth", "dest": "/api/admin/auth.js" },
-      { "src": "/(.*)", "dest": "/api/index.js" }
-    ],
-    "env": {
-      "ADMIN_WALLET": "88gfwHfGKQLgJHX7JQVp9E5Va2ChzGGYH6aZkNYSPaZ8",
-      "SOLANA_NETWORK": "mainnet"
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
     }
+  ],
+  "routes": [
+    { "src": "/create-token", "dest": "/api/create-token.js" },
+    { "src": "/update-metadata", "dest": "/api/update-metadata.js" },
+    { "src": "/rpc", "dest": "/api/rpc.js" },
+    { "src": "/admin/auth", "dest": "/api/admin/auth.js" },
+    { "src": "/(.*)", "dest": "/api/index.js" }
+  ],
+  "env": {
+    "ADMIN_WALLET": "88gfwHfGKQLgJHX7JQVp9E5Va2ChzGGYH6aZkNYSPaZ8",
+    "SOLANA_NETWORK": "mainnet"
   }
+}

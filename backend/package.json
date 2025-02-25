@@ -1,10 +1,11 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "api/index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
+    "start": "node api/index.js",
+    "dev": "nodemon api/index.js",
+    "build": "echo 'Build step completed'",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -14,22 +15,16 @@
   "description": "",
   "dependencies": {
     "@metaplex-foundation/mpl-token-metadata": "^3.3.0",
-    "@metaplex-foundation/umi": "^3.3.0",
+    "@metaplex-foundation/umi": "^0.9.3",
     "@solana/spl-token": "^0.4.12",
     "@solana/web3.js": "^1.98.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "serverless-http": "^3.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"
-  },
-  "scripts": {
-  "start": "node index.js",
-  "dev": "nodemon index.js",
-  "rebuild": "npm rebuild",
-  "test": "echo \"Error: no test specified\" && exit 1"
-}
-  
+  }
 }
