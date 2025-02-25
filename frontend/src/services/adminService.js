@@ -1,6 +1,7 @@
-// src/services/adminService.js
+// frontend/src/services/adminService.js
 
-const API_URL = process.env.REACT_APP_API_URL;
+// Definir a URL da API com fallback para desenvolvimento local
+const API_URL = process.env.REACT_APP_API_URL || 'https://seu-backend.vercel.app';
 
 /**
  * Verifica se o wallet é de um administrador
@@ -16,6 +17,12 @@ export const verifyAdmin = async (wallet) => {
       },
       body: JSON.stringify({ wallet }),
     });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Status: ${response.status}, Erro: ${errorText}`);
+    }
+    
     return await response.json();
   } catch (error) {
     console.error("Erro ao verificar admin:", error);
@@ -37,6 +44,12 @@ export const getDashboardStats = async (wallet) => {
       },
       body: JSON.stringify({ wallet }),
     });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Status: ${response.status}, Erro: ${errorText}`);
+    }
+    
     return await response.json();
   } catch (error) {
     console.error("Erro ao obter estatísticas:", error);
@@ -69,6 +82,12 @@ export const getLogs = async ({ wallet, page = 1, limit = 10, type = "", search 
         search: search || undefined
       }),
     });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Status: ${response.status}, Erro: ${errorText}`);
+    }
+    
     return await response.json();
   } catch (error) {
     console.error("Erro ao obter logs:", error);
@@ -92,6 +111,12 @@ export const recordTokenCreation = async ({ wallet, fee }) => {
       },
       body: JSON.stringify({ wallet, fee }),
     });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Status: ${response.status}, Erro: ${errorText}`);
+    }
+    
     return await response.json();
   } catch (error) {
     console.error("Erro ao registrar criação de token:", error);
@@ -114,9 +139,31 @@ export const recordMetadataUpdate = async ({ wallet }) => {
       },
       body: JSON.stringify({ wallet }),
     });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Status: ${response.status}, Erro: ${errorText}`);
+    }
+    
     return await response.json();
   } catch (error) {
     console.error("Erro ao registrar atualização de metadados:", error);
     return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Verifica o status da conexão com o backend
+ * @returns {Promise<boolean>} Status da conexão
+ */
+export const checkBackendConnection = async () => {
+  try {
+    const response = await fetch(`${API_URL}/admin/auth`, {
+      method: "HEAD"
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("Backend não disponível:", error);
+    return false;
   }
 };
