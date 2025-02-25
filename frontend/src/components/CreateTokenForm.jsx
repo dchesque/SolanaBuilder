@@ -4,6 +4,8 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useNavigate } from "react-router-dom";
 import WalletConnect from "./WalletConnect";
 import CostEstimate from "./CostEstimate";
+import { ExternalLink } from 'lucide-react';
+import TokenPDFGenerator from '../components/pdf/TokenPDFGenerator';
 import { 
   Transaction,
   SystemProgram,
@@ -42,6 +44,18 @@ export default function CreateTokenForm() {
     burnable: false,
     freezable: false,
   });
+
+  // Adicione aqui os novos métodos de validação
+const validateTokenName = (name) => {
+  if (!name) return "";
+  if (name.length > 32) {
+    return "Token name must be 32 characters or less.";
+  }
+  return "";
+};
+
+// Chame a validação antes de usar
+const tokenNameError = validateTokenName(nomeToken);
 
   // Variables to store the created token data
   const [createdTokenData, setCreatedTokenData] = useState(null);
@@ -488,6 +502,7 @@ export default function CreateTokenForm() {
                 disabled={step !== 1}
                 required
               />
+                {tokenNameError && <p className="text-xs text-red-400 mt-1">{tokenNameError}</p>}
             </div>
 
             <div>
@@ -530,33 +545,76 @@ export default function CreateTokenForm() {
           </>
         )}
 
-        {step === 3 && createdTokenData && (
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-purple-900/20 border border-purple-500/20">
-              <h3 className="text-lg font-semibold text-purple-200 mb-2">Created Token Details</h3>
-              <div className="space-y-2">
-                <p className="text-sm text-purple-200">
-                  <span className="font-semibold">Address:</span> {createdTokenData.mintAddress}
-                </p>
-                <p className="text-sm text-purple-200">
-                  <span className="font-semibold">Name:</span> {createdTokenData.name}
-                </p>
-                <p className="text-sm text-purple-200">
-                  <span className="font-semibold">Symbol:</span> {createdTokenData.symbol}
-                </p>
-                <p className="text-sm text-purple-200">
-                  <span className="font-semibold">Supply:</span> {createdTokenData.supply.toLocaleString()}
-                </p>
-              </div>
-            </div>
-            
-            <div className="p-4 rounded-xl bg-[#1D0F35] border border-purple-500/20">
-              <p className="text-sm text-center text-purple-200">
-                Click "Add Metadata" to complete the creation of your token.
-              </p>
-            </div>
-          </div>
-        )}
+
+{step === 3 && createdTokenData && (
+  <div className="space-y-4">
+    <div className="p-4 rounded-xl bg-purple-900/20 border border-purple-500/20">
+      <h3 className="text-lg font-semibold text-purple-200 mb-4">Created Token Details</h3>
+      
+      {/* Token Details Grid */}
+      <div className="grid gap-4">
+        {/* Address */}
+        <div className="p-3 bg-purple-900/30 rounded-lg">
+          <p className="text-sm text-purple-200">
+            <span className="font-semibold">Address:</span> 
+            <span className="ml-2 font-mono">{createdTokenData.mintAddress}</span>
+          </p>
+        </div>
+        
+        {/* Name with warning */}
+        <div className="p-3 bg-purple-900/30 rounded-lg flex items-center justify-between">
+          <p className="text-sm text-purple-200">
+            <span className="font-semibold">Name:</span> 
+            <span className="ml-2">{createdTokenData.name}</span>
+          </p>
+          <span className="px-2 py-1 text-xs bg-yellow-500/20 text-yellow-400 rounded-full">
+            Not yet on-chain
+          </span>
+        </div>
+        
+        {/* Symbol with warning */}
+        <div className="p-3 bg-purple-900/30 rounded-lg flex items-center justify-between">
+          <p className="text-sm text-purple-200">
+            <span className="font-semibold">Symbol:</span> 
+            <span className="ml-2">{createdTokenData.symbol}</span>
+          </p>
+          <span className="px-2 py-1 text-xs bg-yellow-500/20 text-yellow-400 rounded-full">
+            Not yet on-chain
+          </span>
+        </div>
+        
+        {/* Supply */}
+        <div className="p-3 bg-purple-900/30 rounded-lg">
+          <p className="text-sm text-purple-200">
+            <span className="font-semibold">Supply:</span> 
+            <span className="ml-2">{createdTokenData.supply.toLocaleString()}</span>
+          </p>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="mt-6 flex items-center gap-3">
+        <a
+          href={`https://solscan.io/token/${createdTokenData.mintAddress}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg text-purple-200 transition-all"
+        >
+          <ExternalLink className="w-4 h-4" />
+          View on Solscan
+        </a>
+        <TokenPDFGenerator tokenData={createdTokenData} />
+      </div>
+    </div>
+
+    {/* Next Steps Card */}
+    <div className="p-4 rounded-xl bg-[#1D0F35] border border-purple-500/20">
+      <p className="text-sm text-center text-purple-200">
+        Click "Add Metadata" below to register your token's name and symbol on-chain
+      </p>
+    </div>
+  </div>
+)}
 
         {message && (
           <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">

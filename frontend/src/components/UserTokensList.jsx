@@ -6,21 +6,36 @@ import {
   Twitter,
   Send as Telegram,
   Github,
-  Link as LinkIcon,
   Copy,
   LayoutGrid,
   Settings,
   Sparkles,
-  Loader2,
-  Flame as BurnIcon
+  Loader2
 } from 'lucide-react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { Metaplex, walletAdapterIdentity } from '@metaplex-foundation/js';
-import { Transaction, SystemProgram, PublicKey } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { Metadata } from '@metaplex-foundation/mpl-token-metadata';
 
-// Componente principal da lista de tokens
+// Função para tentar obter a data de criação do token usando o histórico de assinaturas da conta mint
+async function getTokenCreationDate(mintAddress, connection) {
+  try {
+    const signatures = await connection.getSignaturesForAddress(mintAddress, { limit: 100 });
+    if (signatures && signatures.length > 0) {
+      const oldestSignature = signatures[signatures.length - 1];
+      const blockTime = await connection.getBlockTime(oldestSignature.signature);
+      if (blockTime) {
+        return new Date(blockTime * 1000);
+      }
+    }
+    return null;
+  } catch (err) {
+    console.error('Error fetching token creation date from RPC:', err);
+    return null;
+  }
+}
+
 export default function UserTokensList() {
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -29,42 +44,39 @@ export default function UserTokensList() {
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showActions, setShowActions] = useState({});
+  
+  // State for general text filter
+  const [filter, setFilter] = useState("");
+  // Additional filter states
+  const [filterWithMetadata, setFilterWithMetadata] = useState(false);
+  const [filterWithHolders, setFilterWithHolders] = useState(false);
+  // Sorting order: "new" for Newest First, "old" for Oldest First
+  const [sortOrder, setSortOrder] = useState("new");
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    // TODO: Adicionar notificação de sucesso
+    // TODO: Add success notification
   };
 
-  // Funções para manipular tokens
-  const handleMint = async (token) => {
-    // Implementar lógica de mint
-  };
-
-  const handleBurn = async (token) => {
-    // Implementar lógica de burn
-  };
-
-  const handlePause = async (token) => {
-    // Implementar lógica de pause
-  };
-
-  const handleAction = async (action, token) => {
-    // Implementar lógica de ações
-    switch (action) {
-      case 'mint':
-        await handleMint(token);
-        break;
-      case 'burn':
-        await handleBurn(token);
-        break;
-      case 'pause':
-        await handlePause(token);
-        break;
+  // Function to fetch token holders count using Solscan
+  async function getHoldersCount(mintAddress) {
+    const solscanUrl = `https://public-api.solscan.io/token/holders?tokenAddress=${mintAddress.toString()}`;
+    try {
+      const response = await fetch(solscanUrl);
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        return data.length;
+      } else if (data.total) {
+        return data.total;
+      }
+      return 0;
+    } catch (err) {
+      console.error('Error fetching holders count:', err);
+      return 0;
     }
-  };
+  }
 
-  // Efeito para carregar os tokens
+  // Effect to load tokens
   useEffect(() => {
     const fetchUserTokens = async () => {
       if (!publicKey) return;
@@ -73,59 +85,52 @@ export default function UserTokensList() {
         setLoading(true);
         setError(null);
     
-        // Inicializa o Metaplex
         const metaplex = new Metaplex(connection);
         metaplex.use(walletAdapterIdentity(wallet));
 
-        // Buscar todos os Mints da wallet usando getParsedTokenAccountsByOwner
         const ownedTokens = await connection.getParsedTokenAccountsByOwner(
           publicKey,
           { programId: TOKEN_PROGRAM_ID }
         );
 
-        console.log('Wallet publicKey:', publicKey.toString());
-        console.log('Token accounts found:', ownedTokens.value.length);
-
-        // Array para armazenar as mint addresses únicas
+        // Set to store unique mint addresses
         const uniqueMints = new Set();
 
-        // Buscar informações de cada token
         const myTokens = await Promise.all(
           ownedTokens.value.map(async ({ account }) => {
             try {
               const tokenData = account.data.parsed.info;
               const mintAddress = new PublicKey(tokenData.mint);
 
-              // Pular se já processamos este mint
               if (uniqueMints.has(mintAddress.toString())) {
                 return null;
               }
 
-              // Verificar se a wallet é mint authority
               const mintInfo = await connection.getParsedAccountInfo(mintAddress);
               if (!mintInfo.value) return null;
               
               const mintData = mintInfo.value.data.parsed.info;
               
-              // Verificar se a wallet é mint authority
               if (mintData.mintAuthority !== publicKey.toString()) {
                 return null;
               }
 
               uniqueMints.add(mintAddress.toString());
+              
+              // Tenta obter a data de criação via RPC; se não obtiver, usa null
+              const creationDate = await getTokenCreationDate(mintAddress, connection);
+
+              // Fetch holders count
+              const holdersCount = await getHoldersCount(mintAddress);
 
               try {
-                // Buscar metadata do token usando Metaplex
                 const nft = await metaplex.nfts().findByMint({ mintAddress });
-                console.log('Token metadata:', nft);
                 
-                // Buscar dados extras do URI se existir
                 let externalMetadata = {};
                 if (nft.uri) {
                   try {
                     const response = await fetch(nft.uri);
                     externalMetadata = await response.json();
-                    console.log('External metadata:', externalMetadata);
                   } catch (err) {
                     console.error('Error fetching token external metadata:', err);
                   }
@@ -136,7 +141,7 @@ export default function UserTokensList() {
                   symbol: nft.symbol || '',
                   address: mintAddress.toString(),
                   supply: parseInt(mintData.supply) / Math.pow(10, mintData.decimals),
-                  createdAt: new Date(),
+                  createdAt: creationDate, // Pode ser null se não obtido
                   imageUrl: externalMetadata.image || null,
                   website: externalMetadata.external_url || externalMetadata.links?.website || null,
                   twitter: externalMetadata.links?.twitter || null,
@@ -145,12 +150,11 @@ export default function UserTokensList() {
                   isMintable: true,
                   isBurnable: true,
                   isPausable: false,
-                  isPaused: false
+                  isPaused: false,
+                  holders: holdersCount
                 };
               } catch (metaplexErr) {
                 console.error('Error loading token metadata from Metaplex:', metaplexErr);
-                
-                // Método alternativo usando Metadata PDA
                 try {
                   const metadataPDA = await Metadata.getPDA(mintAddress);
                   const metadata = await Metadata.load(connection, metadataPDA);
@@ -160,7 +164,7 @@ export default function UserTokensList() {
                     symbol: metadata.data.data.symbol || '',
                     address: mintAddress.toString(),
                     supply: parseInt(mintData.supply) / Math.pow(10, mintData.decimals),
-                    createdAt: new Date(),
+                    createdAt: creationDate,
                     imageUrl: null,
                     website: null,
                     twitter: null,
@@ -169,7 +173,8 @@ export default function UserTokensList() {
                     isMintable: true,
                     isBurnable: true,
                     isPausable: false,
-                    isPaused: false
+                    isPaused: false,
+                    holders: holdersCount
                   };
                 } catch (pdaErr) {
                   console.error('Error loading token metadata from PDA:', pdaErr);
@@ -178,7 +183,7 @@ export default function UserTokensList() {
                     symbol: '',
                     address: mintAddress.toString(),
                     supply: parseInt(mintData.supply) / Math.pow(10, mintData.decimals),
-                    createdAt: new Date(),
+                    createdAt: creationDate,
                     imageUrl: null,
                     website: null,
                     twitter: null,
@@ -187,7 +192,8 @@ export default function UserTokensList() {
                     isMintable: true,
                     isBurnable: true,
                     isPausable: false,
-                    isPaused: false
+                    isPaused: false,
+                    holders: holdersCount
                   };
                 }
               }
@@ -198,9 +204,7 @@ export default function UserTokensList() {
           })
         );
     
-        // Remover tokens que falharam ao carregar metadata
         const validTokens = myTokens.filter(token => token !== null);
-        console.log('Valid tokens found:', validTokens.length);
         setTokens(validTokens);
       } catch (err) {
         console.error('Error fetching tokens:', err);
@@ -212,6 +216,41 @@ export default function UserTokensList() {
 
     fetchUserTokens();
   }, [connection, publicKey, wallet]);
+
+  // Apply filters: general text filter, metadata filter, and holders filter
+  const filteredTokens = tokens.filter(token => {
+    // General text filter
+    const textMatch =
+      token.name.toLowerCase().includes(filter.toLowerCase()) ||
+      token.symbol.toLowerCase().includes(filter.toLowerCase()) ||
+      token.address.toLowerCase().includes(filter.toLowerCase());
+    if (!textMatch) return false;
+
+    // Filter: Only tokens with metadata – agora checa se o nome não é "Unknown Token"
+    if (filterWithMetadata) {
+      if (token.name === 'Unknown Token' || !token.name) {
+        return false;
+      }
+    }
+
+    // Filter: Only tokens with holders (holders > 0)
+    if (filterWithHolders) {
+      if (token.holders <= 0) return false;
+    }
+
+    return true;
+  });
+
+  // Sorting tokens based on creation date
+  const sortedTokens = [...filteredTokens].sort((a, b) => {
+    const dateA = a.createdAt ? new Date(a.createdAt) : new Date(0);
+    const dateB = b.createdAt ? new Date(b.createdAt) : new Date(0);
+    if (sortOrder === 'new') {
+      return dateB - dateA;
+    } else {
+      return dateA - dateB;
+    }
+  });
 
   if (loading) {
     return (
@@ -246,11 +285,55 @@ export default function UserTokensList() {
 
   return (
     <div>
+      {/* General Text Filter */}
+      <div className="mb-6">
+        <input
+          type="text"
+          placeholder="Filter tokens (name, symbol or address)"
+          className="w-full px-4 py-2 rounded-lg bg-purple-900/20 text-white placeholder-purple-300"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+      </div>
+
+      {/* Additional Filters *
+      <div className="mb-6 flex flex-wrap gap-4">
+        <label className="inline-flex items-center gap-2 text-white">
+          <input
+            type="checkbox"
+            checked={filterWithMetadata}
+            onChange={(e) => setFilterWithMetadata(e.target.checked)}
+            className="form-checkbox"
+          />
+          Only tokens with metadata
+        </label>
+        <label className="inline-flex items-center gap-2 text-white">
+          <input
+            type="checkbox"
+            checked={filterWithHolders}
+            onChange={(e) => setFilterWithHolders(e.target.checked)}
+            className="form-checkbox"
+          />
+          Only tokens with holders
+        </label>
+        <label className="inline-flex items-center gap-2 text-white">
+          Sort by:
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            className="bg-purple-900/20 text-white rounded-lg px-2 py-1"
+          >
+            <option value="new">Newest First</option>
+            <option value="old">Oldest First</option>
+          </select>
+        </label>
+      </div>/}
+
       {/* View Controls */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <div className="text-sm text-purple-300">
-            {tokens.length} {tokens.length === 1 ? 'Token' : 'Tokens'} Found
+            {sortedTokens.length} {sortedTokens.length === 1 ? 'Token Found' : 'Tokens Found'}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -260,7 +343,7 @@ export default function UserTokensList() {
         </div>
       </div>
 
-      {tokens.length === 0 ? (
+      {sortedTokens.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-12 bg-[#1D0F35]/30 backdrop-blur-sm rounded-2xl border border-purple-500/20">
           <div className="bg-purple-900/30 p-4 rounded-full mb-6">
             <Coins className="w-10 h-10 text-purple-400" />
@@ -279,7 +362,7 @@ export default function UserTokensList() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tokens.map((token) => (
+          {sortedTokens.map((token) => (
             <div key={token.address} className="group">
               <div className="bg-[#1D0F35]/30 backdrop-blur-sm rounded-2xl border border-purple-500/20 p-6 hover:border-purple-500/40 transition-all duration-300 h-full">
                 {/* Token Header */}
@@ -299,9 +382,10 @@ export default function UserTokensList() {
                       )}
                     </div>
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
+                      {/* Name and symbol in separate lines */}
+                      <div className="mb-1">
                         <h3 className="text-xl font-bold text-white">{token.name}</h3>
-                        <span className="px-2 py-0.5 bg-purple-500/20 rounded-md text-sm font-medium text-purple-300">
+                        <span className="block mt-1 px-2 py-0.5 bg-purple-500/20 rounded-md text-sm font-medium text-purple-300">
                           {token.symbol}
                         </span>
                       </div>
@@ -317,12 +401,6 @@ export default function UserTokensList() {
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setShowActions(prev => ({ ...prev, [token.address]: !prev[token.address] }))}
-                    className="p-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 hover:text-purple-300 transition-all"
-                  >
-                    <Settings className="w-5 h-5" />
-                  </button>
                 </div>
 
                 {/* Token Details */}
@@ -334,9 +412,15 @@ export default function UserTokensList() {
                     </div>
                   </div>
                   <div className="bg-purple-900/20 rounded-xl p-4">
-                    <div className="text-sm text-purple-300 mb-1">Created</div>
+                    <div className="text-sm text-purple-300 mb-1">Created At</div>
                     <div className="font-medium text-white">
-                      {new Date(token.createdAt).toLocaleDateString()}
+                      {token.createdAt ? new Date(token.createdAt).toLocaleDateString() : 'N/A'}
+                    </div>
+                  </div>
+                  <div className="bg-purple-900/20 rounded-xl p-4">
+                    <div className="text-sm text-purple-300 mb-1">Holders</div>
+                    <div className="font-medium text-white">
+                      {token.holders.toLocaleString()}
                     </div>
                   </div>
                 </div>
@@ -387,18 +471,28 @@ export default function UserTokensList() {
                   </div>
                 )}
 
-                {/* Token Actions */}
-                {showActions[token.address] && (
-                  <div className="mt-6">
-                    <Link
-                      to={`/update-metadata?tokenAddress=${token.address}`}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-white font-medium transition-all"
-                    >
-                      <Settings className="w-4 h-4" />
-                      Update Token Info
-                    </Link>
-                  </div>
-                )}
+                {/* Button to view token on Solscan */}
+                <div className="mb-4">
+                  <a
+                    href={`https://solscan.io/token/${token.address}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-white font-medium transition-all"
+                  >
+                    View on Solscan
+                  </a>
+                </div>
+
+                {/* Update Token Info Button */}
+                <div className="mt-6">
+                  <Link
+                    to={`/update-metadata?tokenAddress=${token.address}`}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-white font-medium transition-all"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Update Token Info
+                  </Link>
+                </div>
               </div>
             </div>
           ))}

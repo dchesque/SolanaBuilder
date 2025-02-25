@@ -3,7 +3,7 @@ import { useConnection } from "@solana/wallet-adapter-react";
 import { MINT_SIZE } from "@solana/spl-token";
 import { Coins } from "lucide-react";
 
-const CostEstimate = ({ step = 1 }) => {
+const CostEstimate = ({ feeType = "default" }) => {
   const { connection } = useConnection();
   const [solPrice, setSolPrice] = useState(null);
   const [rentValues, setRentValues] = useState({
@@ -13,7 +13,22 @@ const CostEstimate = ({ step = 1 }) => {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  const serviceFee = parseFloat(process.env.REACT_APP_SERVICE_FEE) || 0.001;
+  // Obtenha a taxa de acordo com o tipo de operação
+  const getServiceFee = () => {
+    switch(feeType) {
+      case "token-details":
+        return parseFloat(process.env.REACT_APP_TOKEN_DETAILS_FEE) || serviceFeeDefault;
+      case "website-image":
+        return parseFloat(process.env.REACT_APP_WEBSITE_IMAGE_FEE) || serviceFeeDefault;
+      case "social-links":
+        return parseFloat(process.env.REACT_APP_SOCIAL_LINKS_FEE) || serviceFeeDefault;
+      default:
+        return serviceFeeDefault;
+    }
+  };
+
+  const serviceFeeDefault = parseFloat(process.env.REACT_APP_SERVICE_FEE) || 0.001;
+  const serviceFee = getServiceFee();
   const networkFee = 0.000008;
 
   const fetchSolPrice = async () => {
@@ -58,9 +73,16 @@ const CostEstimate = ({ step = 1 }) => {
   }, []);
 
   const calculateTotalCosts = () => {
-    const totalNetworkFees = networkFee * 3;
-    const totalRent = rentValues.mintAccount + rentValues.ataAccount + rentValues.metadataAccount;
-    return serviceFee + totalRent + totalNetworkFees;
+    // Para atualizações de metadados, não precisamos de rent para mintAccount e ataAccount
+    if (feeType !== "default") {
+      const totalNetworkFees = networkFee;
+      return serviceFee + totalNetworkFees;
+    } else {
+      // Para criação de token, use todos os custos
+      const totalNetworkFees = networkFee * 3;
+      const totalRent = rentValues.mintAccount + rentValues.ataAccount + rentValues.metadataAccount;
+      return serviceFee + totalRent + totalNetworkFees;
+    }
   };
 
   const totalCost = calculateTotalCosts();
@@ -68,6 +90,20 @@ const CostEstimate = ({ step = 1 }) => {
 
   const formatSol = (value) => value.toFixed(6);
   const formatUsd = (value) => value.toFixed(2);
+  
+  // Rótulos personalizados para cada tipo de taxa
+  const getCostLabel = () => {
+    switch(feeType) {
+      case "token-details":
+        return "Token Details Update Cost";
+      case "website-image":
+        return "Website & Image Update Cost";
+      case "social-links":
+        return "Social Links Update Cost";
+      default:
+        return "Cost Estimate";
+    }
+  };
 
   return (
     <div className="bg-gradient-to-br from-purple-900/30 to-pink-900/20 backdrop-blur-sm rounded-xl border border-purple-500/20 p-4 hover:border-purple-500/30 transition-all duration-300">
@@ -75,7 +111,7 @@ const CostEstimate = ({ step = 1 }) => {
         <div className="p-1.5 rounded-lg bg-purple-500/20">
           <Coins className="w-4 h-4 text-purple-400" />
         </div>
-        <h3 className="text-purple-200 font-medium">Cost Estimate</h3>
+        <h3 className="text-purple-200 font-medium">{getCostLabel()}</h3>
       </div>
       
       {isLoading ? (
@@ -84,15 +120,24 @@ const CostEstimate = ({ step = 1 }) => {
           Calculating costs...
         </div>
       ) : (
-        <div className="flex items-center justify-between mt-2">
-          <span className="text-purple-300">Total Cost:</span>
-          <div className="text-right">
-            <div className="text-white font-semibold text-lg">{formatSol(totalCost)} SOL</div>
-            {solPrice && (
-              <div className="text-purple-300/80 text-xs">
-                ≈ ${formatUsd(totalUsdCost)} USD
-              </div>
-            )}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-purple-300">Service Fee:</span>
+            <div className="text-right">
+              <div className="text-white font-medium">{formatSol(serviceFee)} SOL</div>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-purple-300">Total Cost:</span>
+            <div className="text-right">
+              <div className="text-white font-semibold text-lg">{formatSol(totalCost)} SOL</div>
+              {solPrice && (
+                <div className="text-purple-300/80 text-xs">
+                  ≈ ${formatUsd(totalUsdCost)} USD
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

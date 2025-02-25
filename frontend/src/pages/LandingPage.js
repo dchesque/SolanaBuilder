@@ -88,7 +88,7 @@ export default function LandingPage() {
               to="/token-creator"
               className="bg-purple-500 hover:bg-purple-600 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
             >
-              Create Token
+              Launch App
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
