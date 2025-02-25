@@ -16,5 +16,10 @@
   "env": {
     "ADMIN_WALLET": "88gfwHfGKQLgJHX7JQVp9E5Va2ChzGGYH6aZkNYSPaZ8",
     "SOLANA_NETWORK": "mainnet"
+  },
+  "build": {
+    "env": {
+      "NODE_OPTIONS": "--legacy-peer-deps"
+    }
   }
 }
