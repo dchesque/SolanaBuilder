@@ -2,16 +2,24 @@ const webpack = require('webpack');
 const NodePolyfillPlugin = require('node-polyfill-webpack-plugin');
 
 module.exports = {
-  eslint: {
-    enable: false  // Desabilita completamente o ESLint durante o build
-  },
   webpack: {
     configure: (webpackConfig) => {
-      // Remove ModuleScopePlugin
-      webpackConfig.resolve.plugins = webpackConfig.resolve.plugins.filter(
-        (plugin) => plugin.constructor.name !== 'ModuleScopePlugin'
+      // Remove any existing DefinePlugin for process.env
+      webpackConfig.plugins = webpackConfig.plugins.filter(
+        plugin => !(plugin instanceof webpack.DefinePlugin)
       );
 
+      // Adiciona novo DefinePlugin com valores seguros
+      webpackConfig.plugins.push(
+        new webpack.DefinePlugin({
+          'process.env': JSON.stringify({
+            ...process.env,
+            NODE_ENV: JSON.stringify(process.env.NODE_ENV || 'production')
+          })
+        })
+      );
+
+      // Configurações de fallback anteriores
       webpackConfig.resolve.fallback = {
         ...webpackConfig.resolve.fallback,
         crypto: require.resolve('crypto-browserify'),
@@ -29,19 +37,18 @@ module.exports = {
         'process/browser': 'process/browser.js'
       };
 
-      webpackConfig.plugins = [
-        ...webpackConfig.plugins,
+      webpackConfig.plugins.push(
         new webpack.ProvidePlugin({
           process: 'process/browser.js',
           Buffer: ['buffer', 'Buffer']
         }),
-        new NodePolyfillPlugin(),
-        new webpack.DefinePlugin({
-          'process.env': JSON.stringify(process.env)
-        })
-      ];
+        new NodePolyfillPlugin()
+      );
 
       return webpackConfig;
     }
+  },
+  eslint: {
+    enable: false
   }
 };

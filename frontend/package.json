@@ -39,7 +39,7 @@
   "scripts": {
     "start": "craco start",
     "build": "craco build",
-    "vercel-build": "craco build --max-old-space-size=4096",
+    "vercel-build": "craco build",
     "test": "craco test",
     "eject": "react-scripts eject"
   },
