@@ -1,6 +1,6 @@
 // src/services/adminService.js
 
-const API_URL = "http://localhost:3001";
+const API_URL = process.env.REACT_APP_API_URL;
 
 /**
  * Verifica se o wallet é de um administrador
@@ -16,7 +16,6 @@ export const verifyAdmin = async (wallet) => {
       },
       body: JSON.stringify({ wallet }),
     });
-    
     return await response.json();
   } catch (error) {
     console.error("Erro ao verificar admin:", error);
@@ -38,7 +37,6 @@ export const getDashboardStats = async (wallet) => {
       },
       body: JSON.stringify({ wallet }),
     });
-    
     return await response.json();
   } catch (error) {
     console.error("Erro ao obter estatísticas:", error);
@@ -71,7 +69,6 @@ export const getLogs = async ({ wallet, page = 1, limit = 10, type = "", search 
         search: search || undefined
       }),
     });
-    
     return await response.json();
   } catch (error) {
     console.error("Erro ao obter logs:", error);
@@ -95,7 +92,6 @@ export const recordTokenCreation = async ({ wallet, fee }) => {
       },
       body: JSON.stringify({ wallet, fee }),
     });
-    
     return await response.json();
   } catch (error) {
     console.error("Erro ao registrar criação de token:", error);
@@ -118,7 +114,6 @@ export const recordMetadataUpdate = async ({ wallet }) => {
       },
       body: JSON.stringify({ wallet }),
     });
-    
     return await response.json();
   } catch (error) {
     console.error("Erro ao registrar atualização de metadados:", error);
