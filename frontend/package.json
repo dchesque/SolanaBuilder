@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@craco/craco": "^7.1.0",
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
     "@metaplex-foundation/js": "0.19.4",
@@ -25,6 +24,7 @@
     "axios": "0.21.1",
     "class-variance-authority": "^0.6.1",
     "clsx": "^1.2.1",
+    "console-browserify": "^1.2.0",
     "html2canvas": "^1.4.1",
     "html2pdf.js": "^0.10.2",
     "jspdf": "^3.0.0",
@@ -39,6 +39,7 @@
   "scripts": {
     "start": "craco start",
     "build": "craco build",
+    "vercel-build": "craco build",
     "test": "craco test",
     "eject": "react-scripts eject"
   },
@@ -62,6 +63,7 @@
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "@craco/craco": "^7.1.0",
     "@tailwindcss/forms": "^0.5.3",
     "@tailwindcss/typography": "^0.5.9",
     "babel-plugin-module-resolver": "^5.0.0",
