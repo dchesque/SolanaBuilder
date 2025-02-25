@@ -5,22 +5,17 @@ const path = require('path');
 module.exports = {
   webpack: {
     configure: (webpackConfig) => {
-      // Remove ModuleScopePlugin para permitir imports fora de src
+      // Remove ModuleScopePlugin
       webpackConfig.resolve.plugins = webpackConfig.resolve.plugins.filter(
         (plugin) => plugin.constructor.name !== 'ModuleScopePlugin'
       );
 
-      // Substitui todos os imports de process/browser por process/browser.js
-      webpackConfig.module.rules.push({
-        test: /[\\/]node_modules[\\/].*axios[\\/].*\.js$/,
-        loader: 'string-replace-loader',
-        options: {
-          search: 'process/browser',
-          replace: 'process/browser.js',
-        },
-      });
+      // Limpa definições anteriores de process.env
+      webpackConfig.plugins = webpackConfig.plugins.filter(
+        (plugin) => !(plugin instanceof webpack.DefinePlugin)
+      );
 
-      // Configurações de fallback
+      // Configurações de fallback e plugins anteriores mantidas...
       webpackConfig.resolve.fallback = {
         ...webpackConfig.resolve.fallback,
         crypto: require.resolve('crypto-browserify'),
@@ -33,13 +28,11 @@ module.exports = {
         buffer: require.resolve('buffer/')
       };
 
-      // Adiciona alias específico para o process/browser
       webpackConfig.resolve.alias = {
         ...webpackConfig.resolve.alias,
         'process/browser': 'process/browser.js'
       };
 
-      // Adiciona plugins
       webpackConfig.plugins = [
         ...webpackConfig.plugins,
         new webpack.ProvidePlugin({
@@ -53,6 +46,16 @@ module.exports = {
       ];
 
       return webpackConfig;
+    }
+  },
+  // Desabilitar warnings como erros
+  eslint: {
+    configure: (eslintConfig) => {
+      eslintConfig.rules = {
+        ...eslintConfig.rules,
+        'no-unused-vars': 'warn'
+      };
+      return eslintConfig;
     }
   }
 };
