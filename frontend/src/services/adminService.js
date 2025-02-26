@@ -1,7 +1,7 @@
 // frontend/src/services/adminService.js
 
 // Definir a URL da API com fallback para desenvolvimento local
-const API_URL = process.env.REACT_APP_API_URL || 'https://seu-backend.vercel.app';
+const API_URL = process.env.REACT_APP_API_URL || 'https://solana-mint-backend.vercel.app';
 
 /**
  * Verifica se o wallet é de um administrador

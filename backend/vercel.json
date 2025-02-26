@@ -6,13 +6,19 @@
       "use": "@vercel/node"
     }
   ],
-  "routes": [
-    { "src": "/create-token", "dest": "/api/create-token.js" },
-    { "src": "/update-metadata", "dest": "/api/update-metadata.js" },
-    { "src": "/rpc", "dest": "/api/rpc.js" },
-    { "src": "/admin/auth", "dest": "/api/admin/auth.js" },
-    { "src": "/(.*)", "dest": "/api/index.js" }
-  ],
+  
+    "routes": [
+      { "src": "/create-token", "dest": "/api/create-token.js" },
+      { "src": "/update-metadata", "dest": "/api/update-metadata.js" },
+      { "src": "/rpc", "dest": "/api/rpc.js" },
+      { "src": "/admin/auth", "dest": "/api/admin/auth.js" },
+      { "src": "/admin/stats", "dest": "/api/admin/stats.js" },
+      { "src": "/admin/logs", "dest": "/api/admin/logs.js" },
+      { "src": "/admin/record-token-creation", "dest": "/api/admin/record-token-creation.js" },
+      { "src": "/admin/record-metadata-update", "dest": "/api/admin/record-metadata-update.js" },
+      { "src": "/(.*)", "dest": "/api/index.js" }
+    ],
+  
   "env": {
     "ADMIN_WALLET": "88gfwHfGKQLgJHX7JQVp9E5Va2ChzGGYH6aZkNYSPaZ8",
     "SOLANA_NETWORK": "mainnet"
