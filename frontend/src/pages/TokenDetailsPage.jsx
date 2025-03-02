@@ -48,10 +48,9 @@ const TokenDetailsPage = () => {
               <nav className="max-w-7xl mx-auto flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <Coins className="w-6 h-6 text-purple-400" />
-                    <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                      SolanaMint
-                    </span>
+                  <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+  Solana Builder
+</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
@@ -249,7 +248,7 @@ const TokenDetailsPage = () => {
       <footer className="relative bg-black/30 backdrop-blur-md border-t border-purple-500/20 py-8 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between text-sm text-purple-400">
-            <div>© 2025 SolanaMint. All rights reserved.</div>
+          <div>© 2025 Solana Builder. All rights reserved.</div>
             <div className="flex gap-6 mt-4 md:mt-0">
               <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
               <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>

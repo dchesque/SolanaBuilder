@@ -846,10 +846,9 @@ export default function AdminPage() {
       <header className="fixed top-0 left-0 right-0 bg-[#0B0120]/80 backdrop-blur-md border-b border-purple-500/20 p-4 z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Coins className="w-6 h-6 text-purple-400" />
-            <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              SolanaMint Admin
-            </span>
+          <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+  Solana Builder Admin
+</span>
           </div>
           
           <div className="flex items-center gap-4">

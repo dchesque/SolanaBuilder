@@ -70,12 +70,16 @@ export default function LandingPage() {
       <header className="fixed top-0 left-0 right-0 bg-black/30 backdrop-blur-md border-b border-purple-500/20 p-4 z-50">
         <nav className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Coins className="w-6 h-6 text-purple-400" />
-              <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                SolanaMint
-              </span>
-            </div>
+          <div className="flex items-center gap-2">
+  <img 
+    src="/img/logo_solanabuilder.png" 
+    alt="Solana Builder Logo" 
+    className="w-8 h-8" 
+  />
+  <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+    Solana Builder
+  </span>
+</div>
             <div className="hidden md:flex gap-6 ml-8">
               <a href="#features" className="text-purple-300 hover:text-white transition-colors">Features</a>
               <a href="#how-it-works" className="text-purple-300 hover:text-white transition-colors">How It Works</a>
@@ -274,12 +278,14 @@ Create and Launch Your Own Solana Token in Minutes!
       {/* Coluna 1 - Logo e Descrição */}
       <div>
         {/* Logo SolanaMint */}
-        <div className="flex items-center gap-2 mb-4">
-          <Coins className="w-6 h-6 text-purple-400" />
-          <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            SolanaMint
-          </span>
-        </div>
+        <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+  Solana Builder
+</span>
+
+// And in footer description
+<p className="text-purple-300 text-sm">
+  The easiest way to create and launch your Solana token.
+</p>
         {/* Descrição do Produto */}
         <p className="text-purple-300 text-sm">
           The easiest way to create and launch your Solana token.
@@ -320,7 +326,7 @@ Create and Launch Your Own Solana Token in Minutes!
     {/* Barra inferior com Copyright e Links Legais */}
     <div className="border-t border-purple-500/20 pt-8 flex flex-col md:flex-row items-center justify-between text-sm text-purple-400">
       {/* Copyright */}
-      <div>© 2025 SolanaMint. All rights reserved.</div>
+      <div>© 2025 Solana Builder. All rights reserved.</div>
       {/* Links de Políticas */}
       <div className="flex gap-6 mt-4 md:mt-0">
         <a href="/privacy" className="hover:text-white">Privacy Policy</a>

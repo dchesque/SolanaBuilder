@@ -44,10 +44,9 @@ export default function UpdateMetadataPage() {
       <header className="fixed top-0 left-0 right-0 bg-[#0B0120]/80 backdrop-blur-md border-b border-purple-500/20 p-4 z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-center">
           <Link to="/" className="flex items-center gap-2">
-            <Coins className="w-6 h-6 text-purple-400" />
-            <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              SolanaMint
-            </span>
+          <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+  Solana Builder
+</span>
           </Link>
         </div>
       </header>
@@ -217,7 +216,7 @@ export default function UpdateMetadataPage() {
       <footer className="relative bg-black/30 backdrop-blur-md border-t border-purple-500/20 py-8 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between text-sm text-purple-400">
-            <div>© 2025 SolanaMint. All rights reserved.</div>
+          <div>© 2025 Solana Builder. All rights reserved.</div>
             <div className="flex gap-6 mt-4 md:mt-0">
               <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
               <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
