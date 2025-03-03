@@ -1,3 +1,8 @@
+// src/pages/TokenDetailsPage.jsx
+// Token Details Page Component
+// This component displays detailed information about a specific token, including its name, ticker, total supply, and token address.
+// It also provides action buttons to view the token on Solscan, update its metadata, and generate a PDF with token details.
+
 import React from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
 import { 
@@ -18,12 +23,12 @@ import {
 import TokenDetailsPDFGenerator from '../components/pdf/TokenDetailsPDFGenerator';
 
 const TokenDetailsPage = () => {
+  // Retrieve token data passed via location state
   const location = useLocation();
   const navigate = useNavigate();
   const { tokenAddress = "", tokenName = "Token", ticker = "TICK", supply = 0 } = location.state || {};
 
-
-  // Function to copy token address
+  // Function to copy token address to the clipboard
   const copyToClipboard = () => {
     navigator.clipboard.writeText(tokenAddress);
     alert("Token address copied to clipboard!");
@@ -31,42 +36,44 @@ const TokenDetailsPage = () => {
 
   return (
     <div className="min-h-screen bg-[#0B0120]">
-      {/* Background gradients */}
+      {/* Background Gradients */}
       <div className="fixed inset-0">
         <div className="absolute -top-1/4 -left-1/4 w-2/3 h-1/2 bg-purple-900/40 rounded-full blur-[120px]" />
         <div className="absolute -top-1/4 right-0 w-2/4 h-2/3 bg-pink-900/30 rounded-full blur-[120px]" />
         <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 w-1/2 h-1/2 bg-purple-800/30 rounded-full blur-[160px]" />
       </div>
 
-      {/* Pattern overlay */}
+      {/* Pattern Overlay */}
       <div className="fixed inset-0 opacity-[0.02]" style={{
         backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")"
       }} />
 
-      {/* Header Atualizado */}
-            <header className="fixed top-0 left-0 right-0 bg-black/30 backdrop-blur-md border-b border-purple-500/20 p-4 z-50">
-              <nav className="max-w-7xl mx-auto flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                  <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-  Solana Builder
-</span>
-                  </div>
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 bg-black/30 backdrop-blur-md border-b border-purple-500/20 p-4 z-50">
+        <nav className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Link to="/" className="flex items-center gap-2">
+                {/* Solana Builder Logo */}
+                <div className="flex items-center">
+                  <img src="/img/logo_solanabuilder.png" alt="Solana Builder" className="h-7" />
                 </div>
-                <div className="flex items-center gap-4">
-      
-                  <Link 
-                    to="/token-creator"
-                    className="bg-purple-500 hover:bg-purple-600 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    Return to App
-                    <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              </nav>
-            </header>
+              </Link>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <Link 
+              to="/token-creator"
+              className="bg-purple-500 hover:bg-purple-600 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+            >
+              Return to App
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </nav>
+      </header>
 
-      {/* MAIN CONTENT */}
+      {/* Main Content */}
       <main className="relative pt-32 pb-20 px-4 text-white min-h-screen">
         <div className="max-w-7xl mx-auto">
           {/* Status Badge */}
@@ -248,7 +255,7 @@ const TokenDetailsPage = () => {
       <footer className="relative bg-black/30 backdrop-blur-md border-t border-purple-500/20 py-8 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between text-sm text-purple-400">
-          <div>© 2025 Solana Builder. All rights reserved.</div>
+            <div>© 2025 Solana Builder. All rights reserved.</div>
             <div className="flex gap-6 mt-4 md:mt-0">
               <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
               <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>

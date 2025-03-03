@@ -1,4 +1,8 @@
 // CreateOrUpdateMetadataPage.jsx
+// This page allows you to create or update token metadata on-chain.
+// It collects metadata from the user, uploads it to an off-chain service (simulated),
+// and then updates the token's metadata on-chain using the Metaplex SDK.
+
 import React, { useState } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, clusterApiUrl } from '@solana/web3.js';
@@ -8,6 +12,7 @@ const CreateOrUpdateMetadataPage = ({ tokenMintAddress }) => {
   const { publicKey, wallet } = useWallet();
   const { connection } = useConnection();
 
+  // State for the form data and upload status
   const [formData, setFormData] = useState({
     name: '',
     symbol: '',
@@ -18,7 +23,7 @@ const CreateOrUpdateMetadataPage = ({ tokenMintAddress }) => {
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState('');
 
-  // Função simulada para upload de metadados para um serviço off-chain (substitua em produção)
+  // Simulated function to upload metadata to an off-chain service (replace in production)
   const uploadMetadataToIPFS = async (metadataJson) => {
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -27,15 +32,16 @@ const CreateOrUpdateMetadataPage = ({ tokenMintAddress }) => {
     });
   };
 
+  // Handle form submission: upload metadata and update on-chain
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!publicKey) {
-      setStatus('Conecte sua wallet para continuar.');
+      setStatus('Connect your wallet to continue.');
       return;
     }
 
     setUploading(true);
-    setStatus('Enviando metadados para o serviço off-chain...');
+    setStatus('Uploading metadata to the off-chain service...');
 
     try {
       const metadataJson = {
@@ -46,11 +52,11 @@ const CreateOrUpdateMetadataPage = ({ tokenMintAddress }) => {
         external_url: formData.website,
       };
 
-      // Realiza o upload dos metadados e obtém a URI (simulada)
+      // Upload metadata and obtain the URI (simulated)
       const uri = await uploadMetadataToIPFS(metadataJson);
-      setStatus('Metadados enviados. Atualizando on-chain...');
+      setStatus('Metadata uploaded. Updating on-chain...');
 
-      // Cria a instância do Metaplex usando o novo SDK
+      // Create a Metaplex instance using the new SDK
       const metaplex = Metaplex.make(connection)
         .use(keypairIdentity(wallet))
         .use(
@@ -61,13 +67,13 @@ const CreateOrUpdateMetadataPage = ({ tokenMintAddress }) => {
           })
         );
 
-      // Converte tokenMintAddress para PublicKey, se necessário
+      // Convert tokenMintAddress to PublicKey if necessary
       const mintAddress =
         typeof tokenMintAddress === 'string'
           ? new PublicKey(tokenMintAddress)
           : tokenMintAddress;
 
-      // Atualiza os metadados on-chain do NFT/token
+      // Update the on-chain metadata for the NFT/token
       await metaplex.nfts().update({
         mintAddress,
         name: formData.name,
@@ -75,20 +81,20 @@ const CreateOrUpdateMetadataPage = ({ tokenMintAddress }) => {
         uri: uri,
       });
 
-      setStatus('Metadados atualizados com sucesso on-chain!');
+      setStatus('Metadata successfully updated on-chain!');
     } catch (error) {
-      console.error('Erro ao atualizar metadados:', error);
-      setStatus('Erro ao atualizar metadados: ' + error.message);
+      console.error('Error updating metadata:', error);
+      setStatus('Error updating metadata: ' + error.message);
     }
     setUploading(false);
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-black via-purple-950 to-black text-white p-4">
-      <h1 className="text-3xl font-bold mb-6">Atualizar Metadados do Token</h1>
+      <h1 className="text-3xl font-bold mb-6">Update Token Metadata</h1>
       <form onSubmit={handleSubmit} className="w-full max-w-md bg-gray-800 p-6 rounded-lg shadow-lg">
         <label className="block mb-2">
-          Nome:
+          Name:
           <input
             type="text"
             value={formData.name}
@@ -98,7 +104,7 @@ const CreateOrUpdateMetadataPage = ({ tokenMintAddress }) => {
           />
         </label>
         <label className="block mb-2">
-          Símbolo:
+          Symbol:
           <input
             type="text"
             value={formData.symbol}
@@ -108,7 +114,7 @@ const CreateOrUpdateMetadataPage = ({ tokenMintAddress }) => {
           />
         </label>
         <label className="block mb-2">
-          Descrição:
+          Description:
           <textarea
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -116,7 +122,7 @@ const CreateOrUpdateMetadataPage = ({ tokenMintAddress }) => {
           />
         </label>
         <label className="block mb-2">
-          URL da Imagem:
+          Image URL:
           <input
             type="text"
             value={formData.image}
@@ -138,7 +144,7 @@ const CreateOrUpdateMetadataPage = ({ tokenMintAddress }) => {
           disabled={uploading}
           className="w-full bg-purple-600 hover:bg-purple-500 py-2 rounded font-bold"
         >
-          {uploading ? 'Enviando...' : 'Enviar Metadados'}
+          {uploading ? 'Uploading...' : 'Submit Metadata'}
         </button>
       </form>
       {status && <p className="mt-4">{status}</p>}

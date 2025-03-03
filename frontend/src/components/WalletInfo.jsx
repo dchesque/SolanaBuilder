@@ -81,17 +81,10 @@ const WalletInfo = () => {
 
   return (
     <div className="flex items-center gap-4 text-sm">
-      <p className="text-purple-300">
-        Network: <span className="text-white">{NETWORK_DISPLAY_NAME}</span>
-      </p>
+      {/* Network info removed as requested */}
       
-      {/* Debug Connection Details */}
-      {connectionDetails && (
-        <p className="text-purple-300 text-xs">
-          {connectionDetails}
-        </p>
-      )}
-
+      {/* Do not render connection details */}
+      
       <p className="text-purple-300">
         Balance:{" "}
         <span className="text-white">
@@ -110,13 +103,7 @@ const WalletInfo = () => {
           {shortenAddress(publicKey.toBase58())}
         </span>
       </p>
-      {/* My Tokens Button */}
-      <button
-        onClick={() => navigate("/my-tokens")}
-        className="px-4 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-500 transition"
-      >
-        My Tokens
-      </button>
+      {/* My Tokens Button removed as requested */}
     </div>
   );
 };

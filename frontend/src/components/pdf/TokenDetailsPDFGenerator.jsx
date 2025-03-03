@@ -1,3 +1,4 @@
+// src/components/pdf/TokenDetailsPDFGenerator.jsx
 import React from 'react';
 import { jsPDF } from 'jspdf';
 import { Download } from 'lucide-react';
@@ -8,67 +9,81 @@ const TokenDetailsPDFGenerator = ({ tokenData, buttonClassName }) => {
     symbol = 'TICK',
     supply = 0,
     mintAddress = '',
-    createdAt
+    description = '',
+    createdAt = new Date().toISOString(),
+    decimals = 9,
+    website = '',
+    twitter = '',
+    telegram = '',
+    github = '',
+    imageUrl = ''
   } = tokenData || {};
 
   const generatePDF = () => {
-    // 1) Cria o documento
+    // 1) Create document
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
 
-    // 2) Fundo (roxo escuro)
+    // 2) Background (dark purple)
     doc.setFillColor(20, 0, 30);
     doc.rect(0, 0, 210, 297, 'F');
 
-    // 3) Título principal
+    // 3) Header with logo (text representation)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(26);
     doc.setTextColor(255, 255, 255);
-    doc.text('SolanaMint - Token Details', 105, 20, { align: 'center' });
+    doc.text('SolanaBuilder', 105, 20, { align: 'center' });
+    
+    // Website URL
+    doc.setFontSize(10);
+    doc.setTextColor(167, 139, 250);
+    doc.text('solanabuilder.com', 105, 28, { align: 'center' });
 
-    // 4) Data de criação (caso exista) ou data/hora atual
-    const creationDate = createdAt
-      ? new Date(createdAt).toLocaleString()
-      : new Date().toLocaleString();
+    // 4) Document title
+    doc.setFontSize(22);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Token Details Certificate', 105, 40, { align: 'center' });
+
+    // 5) Creation date
+    const creationDate = new Date(createdAt).toLocaleString();
     doc.setFontSize(10);
     doc.setTextColor(200, 200, 255);
-    // Ajuste o valor de Y (16, 28, etc.) para posicionar melhor
     doc.text(`Created: ${creationDate}`, 200, 16, { align: 'right' });
 
-    // 5) Linha de sublinhado do título
+    // 6) Underline for the title
     doc.setDrawColor(138, 79, 255);
     doc.setLineWidth(0.5);
-    doc.line(60, 23, 150, 23);
+    doc.line(40, 45, 170, 45);
 
-    // 6) Card de Informações do Token
+    // 7) Token Information Card
     const cardX = 15;
-    const cardY = 35;
+    const cardY = 55;
     const cardW = 180;
-    const cardH = 70;
+    const cardH = 80;
 
-    // Sombra do card (simulada)
+    // Card shadow
     doc.setFillColor(10, 0, 20);
     doc.roundedRect(cardX + 2, cardY + 2, cardW, cardH, 5, 5, 'F');
 
-    // Fundo do card
+    // Card background
     doc.setFillColor(45, 20, 82);
     doc.roundedRect(cardX, cardY, cardW, cardH, 5, 5, 'F');
 
-    // Borda do card
+    // Card border
     doc.setDrawColor(138, 79, 255);
     doc.setLineWidth(0.3);
     doc.roundedRect(cardX, cardY, cardW, cardH, 5, 5, 'D');
 
-    // Cabeçalho do card
+    // Card header
     doc.setFontSize(16);
     doc.setTextColor(255, 255, 255);
     doc.text('Token Information', cardX + 5, cardY + 10);
     doc.line(cardX + 5, cardY + 12, cardX + cardW - 5, cardY + 12);
 
-    // Nome do Token
+    // Token Name
     doc.setFontSize(10);
     doc.setTextColor(167, 139, 250);
     doc.text('Token Name', cardX + 5, cardY + 22);
@@ -76,10 +91,10 @@ const TokenDetailsPDFGenerator = ({ tokenData, buttonClassName }) => {
     doc.setTextColor(255, 255, 255);
     doc.text(name, cardX + 5, cardY + 29);
 
-    // Ticker
+    // Token Symbol
     doc.setFontSize(10);
     doc.setTextColor(167, 139, 250);
-    doc.text('Token Ticker', cardX + 70, cardY + 22);
+    doc.text('Token Symbol', cardX + 70, cardY + 22);
     doc.setFontSize(12);
     doc.setTextColor(255, 255, 255);
     doc.text(symbol, cardX + 70, cardY + 29);
@@ -92,79 +107,153 @@ const TokenDetailsPDFGenerator = ({ tokenData, buttonClassName }) => {
     doc.setTextColor(255, 255, 255);
     doc.text(`${supply.toLocaleString()} Tokens`, cardX + 5, cardY + 45);
 
-    // Token Address
+    // Decimals
     doc.setFontSize(10);
     doc.setTextColor(167, 139, 250);
-    doc.text('Token Address', cardX + 70, cardY + 38);
+    doc.text('Decimals', cardX + 70, cardY + 38);
     doc.setFontSize(12);
     doc.setTextColor(255, 255, 255);
-    const shortAddress = mintAddress
-      ? `${mintAddress.slice(0, 6)}...${mintAddress.slice(-6)}`
-      : 'N/A';
-    doc.text(shortAddress, cardX + 70, cardY + 45);
+    doc.text(decimals.toString(), cardX + 70, cardY + 45);
 
-    // Botão "View on Solscan"
-    const btnX = cardX + 5;
-    const btnY = cardY + 55;
-    const btnW = 60;
-    const btnH = 8;
-    doc.setFillColor(138, 79, 255);
-    doc.roundedRect(btnX, btnY, btnW, btnH, 2, 2, 'F');
-    doc.setFontSize(11);
-    doc.setTextColor(255, 255, 255);
-    doc.textWithLink('View on Solscan', btnX + btnW / 2, btnY + btnH - 2, {
-      align: 'center',
-      url: `https://solscan.io/token/${mintAddress}`
-    });
-
-    // 7) Seção "Token Possibilities"
-    const possY = cardY + cardH + 20;
-    doc.setFontSize(16);
-    doc.setTextColor(255, 255, 255);
-    doc.text('Token Possibilities', 105, possY, { align: 'center' });
-    doc.line(40, possY + 2, 170, possY + 2);
-
-    const bulletX = 25;
-    let lineY = possY + 12;
-    const possibilities = [
-      'Token Transfers: Send tokens to other wallets or dApps.',
-      'Create Liquidity Pool: Increase accessibility on DEXs (Raydium, Orca).',
-      'Create Staking Program: Incentivize holding via staking.',
-      'Customize Metadata: Add logo, social links, description, etc.'
-    ];
+    // Token Address - Full, without abbreviations
     doc.setFontSize(10);
-    doc.setTextColor(200, 200, 255);
-    possibilities.forEach((p) => {
-      doc.text(`• ${p}`, bulletX, lineY);
-      lineY += 7;
-    });
-
-    // 8) Rodapé
+    doc.setTextColor(167, 139, 250);
+    doc.text('Token Address (Mint)', cardX + 5, cardY + 55);
     doc.setFontSize(8);
-    doc.setTextColor(128, 128, 255);
-    doc.line(10, 285, 200, 285);
-    doc.text('© 2025 SolanaMint. All rights reserved.', 105, 292, {
-      align: 'center'
-    });
+    doc.setTextColor(255, 255, 255);
+    doc.text(mintAddress, cardX + 5, cardY + 62);
 
-    // 9) Metadados do PDF
+    // 8) Description section (if available)
+    let nextY = cardY + cardH + 15;
+    
+    if (description) {
+      doc.setFontSize(14);
+      doc.setTextColor(255, 255, 255);
+      doc.text('Description', 105, nextY, { align: 'center' });
+      doc.setLineWidth(0.3);
+      doc.line(70, nextY + 2, 140, nextY + 2);
+      
+      nextY += 10;
+      doc.setFontSize(10);
+      doc.setTextColor(200, 200, 255);
+      
+      // Split description into lines
+      const splitDescription = doc.splitTextToSize(description, 170);
+      doc.text(splitDescription, 20, nextY);
+      
+      nextY += (splitDescription.length * 5) + 10;
+    }
+
+    // 9) Social Media & Links (if available)
+    doc.setFontSize(14);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Social Media & Links', 105, nextY, { align: 'center' });
+    doc.setLineWidth(0.3);
+    doc.line(70, nextY + 2, 140, nextY + 2);
+    
+    nextY += 10;
+    let hasLinks = false;
+    
+    // Website
+    if (website) {
+      hasLinks = true;
+      doc.setFontSize(10);
+      doc.setTextColor(167, 139, 250);
+      doc.text('Website:', 20, nextY);
+      doc.setTextColor(147, 51, 234);
+      doc.textWithLink(website, 60, nextY, { url: website });
+      nextY += 8;
+    }
+    
+    // Twitter
+    if (twitter) {
+      hasLinks = true;
+      doc.setFontSize(10);
+      doc.setTextColor(167, 139, 250);
+      doc.text('Twitter:', 20, nextY);
+      doc.setTextColor(147, 51, 234);
+      doc.textWithLink(twitter, 60, nextY, { url: twitter });
+      nextY += 8;
+    }
+    
+    // Telegram
+    if (telegram) {
+      hasLinks = true;
+      doc.setFontSize(10);
+      doc.setTextColor(167, 139, 250);
+      doc.text('Telegram:', 20, nextY);
+      doc.setTextColor(147, 51, 234);
+      doc.textWithLink(telegram, 60, nextY, { url: telegram });
+      nextY += 8;
+    }
+    
+    // GitHub
+    if (github) {
+      hasLinks = true;
+      doc.setFontSize(10);
+      doc.setTextColor(167, 139, 250);
+      doc.text('GitHub:', 20, nextY);
+      doc.setTextColor(147, 51, 234);
+      doc.textWithLink(github, 60, nextY, { url: github });
+      nextY += 8;
+    }
+    
+    if (!hasLinks) {
+      doc.setFontSize(10);
+      doc.setTextColor(200, 200, 255);
+      doc.text('No social media links available.', 20, nextY);
+      nextY += 8;
+    }
+    
+    nextY += 10;
+
+    // 10) Useful Links section
+    doc.setFontSize(14);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Useful Links', 105, nextY, { align: 'center' });
+    doc.setLineWidth(0.3);
+    doc.line(70, nextY + 2, 140, nextY + 2);
+    
+    nextY += 10;
+    
+    // Link to Solscan
+    const solscanUrl = `https://solscan.io/token/${mintAddress}`;
+    doc.setFontSize(11);
+    doc.setTextColor(147, 51, 234);
+    doc.textWithLink('View on Solscan', 20, nextY, { url: solscanUrl });
+    nextY += 8;
+    
+    // Link to Solana Explorer
+    const explorerUrl = `https://explorer.solana.com/address/${mintAddress}`;
+    doc.textWithLink('View on Solana Explorer', 20, nextY, { url: explorerUrl });
+    nextY += 8;
+    
+    // Link to Update Metadata
+    const updateUrl = `https://solanabuilder.com/update-metadata?tokenAddress=${mintAddress}`;
+    doc.textWithLink('Update Token Metadata', 20, nextY, { url: updateUrl });
+
+    // 11) Footer
+    doc.setFontSize(10);
+    doc.setTextColor(167, 139, 250);
+    doc.line(20, 280, 190, 280);
+    doc.text('Generated by SolanaBuilder - The easiest way to launch on Solana', 105, 285, { align: 'center' });
+    doc.text('solanabuilder.com', 105, 292, { align: 'center' });
+
+    // 12) PDF metadata
     doc.setProperties({
-      title: 'SolanaMint - Token Details',
-      author: 'SolanaMint',
-      subject: 'Token Creation Details',
-      keywords: 'solana, token, pdf, solanamint'
+      title: 'SolanaBuilder - Token Details',
+      author: 'SolanaBuilder',
+      subject: 'Token Certificate',
+      keywords: 'solana, token, blockchain, solanabuilder'
     });
 
-    // 10) Nome de arquivo dinâmico
-    // Formato: "YYYY-MM-DD_HH-mm-ss_Nome_Ticker - SolanaMint.pdf"
+    // 13) Dynamic filename
+    // Format: "YYYY-MM-DD_Symbol_TokenAddress.pdf"
     const now = new Date();
-    const dateStr = now.toLocaleDateString('en-CA'); // yyyy-mm-dd
-    const timeStr = now
-      .toLocaleTimeString('en-CA', { hour12: false })
-      .replace(/:/g, '-'); // HH-mm-ss
-    const fileName = `${dateStr}_${timeStr}_${name}_${symbol} - SolanaMint.pdf`;
+    const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const fileName = `${dateStr}_${symbol}_${mintAddress.substring(0, 8)}.pdf`;
 
-    // Salva o PDF
+    // Save the PDF
     doc.save(fileName);
   };
 
@@ -173,11 +262,11 @@ const TokenDetailsPDFGenerator = ({ tokenData, buttonClassName }) => {
       onClick={generatePDF}
       className={
         buttonClassName ||
-        'w-full bg-green-900/20 backdrop-blur-md rounded-xl border border-green-500/20 p-4 flex items-center justify-center gap-2 hover:bg-green-900/30 transition-all'
+        'flex items-center justify-center gap-2 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg text-purple-200 transition-all'
       }
     >
-      <Download className="w-5 h-5 text-green-400" />
-      <span className="text-purple-200">Download Token PDF</span>
+      <Download className="w-5 h-5" />
+      <span>Download Token Certificate</span>
     </button>
   );
 };

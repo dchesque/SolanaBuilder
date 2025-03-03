@@ -1,4 +1,8 @@
 // src/pages/AdminPage.jsx
+// Admin Page Component for Solana Builder Admin Panel
+// This file contains components for displaying statistics, logs, tokens, and metadata updates.
+// All user-facing texts have been translated to English and the code has been organized with comments.
+
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
@@ -26,7 +30,11 @@ import {
   Copy
 } from "lucide-react";
 
-// Componente de cartão de estatísticas
+
+// ==================================================================
+// Statistic Card Component
+// Displays a statistic with a title, value, icon, and change percentage.
+// ==================================================================
 const StatCard = ({ title, value, icon, change, color }) => {
   return (
     <div className="bg-purple-900/20 backdrop-blur-sm p-6 rounded-xl border border-purple-500/20 hover:border-purple-500/40 transition-all duration-300">
@@ -36,7 +44,7 @@ const StatCard = ({ title, value, icon, change, color }) => {
           <h3 className="text-3xl font-bold text-white">{value}</h3>
           {change && (
             <p className={`text-xs mt-2 ${change >= 0 ? "text-green-400" : "text-red-400"}`}>
-              {change >= 0 ? "+" : ""}{change}% desde ontem
+              {change >= 0 ? "+" : ""}{change}% since yesterday
             </p>
           )}
         </div>
@@ -48,10 +56,15 @@ const StatCard = ({ title, value, icon, change, color }) => {
   );
 };
 
-// Componente para linha de log
+
+// ==================================================================
+// Log Item Component
+// Displays a log entry with its message, timestamp, and optional details when expanded.
+// ==================================================================
 const LogItem = ({ log }) => {
   const [expanded, setExpanded] = useState(false);
 
+  // Return the text color based on the log type.
   const getStatusColor = (type) => {
     switch (type) {
       case "success":
@@ -64,6 +77,7 @@ const LogItem = ({ log }) => {
     }
   };
 
+  // Return the corresponding icon based on the log type.
   const getStatusIcon = (type) => {
     switch (type) {
       case "success":
@@ -109,13 +123,18 @@ const LogItem = ({ log }) => {
   );
 };
 
-// Componente para Token na lista
+
+// ==================================================================
+// Token Item Component
+// Displays a token information with expandable details including address, creator, decimals, fee, and block height.
+// ==================================================================
 const TokenItem = ({ token }) => {
   const [expanded, setExpanded] = useState(false);
   
+  // Copy provided text to the clipboard and alert the user.
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    alert("Copiado para a área de transferência!");
+    alert("Copied to clipboard!");
   };
 
   return (
@@ -130,7 +149,7 @@ const TokenItem = ({ token }) => {
           <div>
             <p className="text-white font-medium">{token.name} ({token.symbol})</p>
             <p className="text-sm text-purple-300">
-              Criado em: {new Date(token.createdAt).toLocaleString()}
+              Created on: {new Date(token.createdAt).toLocaleString()}
             </p>
           </div>
         </div>
@@ -145,7 +164,7 @@ const TokenItem = ({ token }) => {
         <div className="mt-4 p-3 bg-purple-900/30 rounded-lg">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-purple-200 mb-1">Endereço do Token:</p>
+              <p className="text-sm text-purple-200 mb-1">Token Address:</p>
               <div className="flex items-center gap-2">
                 <code className="text-xs bg-purple-900/50 p-1 rounded font-mono text-purple-100 break-all">
                   {token.address}
@@ -160,7 +179,7 @@ const TokenItem = ({ token }) => {
             </div>
             
             <div>
-              <p className="text-sm text-purple-200 mb-1">Criador:</p>
+              <p className="text-sm text-purple-200 mb-1">Creator:</p>
               <div className="flex items-center gap-2">
                 <code className="text-xs bg-purple-900/50 p-1 rounded font-mono text-purple-100">
                   {token.creator.slice(0, 4)}...{token.creator.slice(-4)}
@@ -177,17 +196,17 @@ const TokenItem = ({ token }) => {
           
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <p className="text-sm text-purple-200 mb-1">Decimais:</p>
+              <p className="text-sm text-purple-200 mb-1">Decimals:</p>
               <p className="text-sm text-white">{token.decimals}</p>
             </div>
             
             <div>
-              <p className="text-sm text-purple-200 mb-1">Taxa:</p>
+              <p className="text-sm text-purple-200 mb-1">Fee:</p>
               <p className="text-sm text-white">{token.fee} SOL</p>
             </div>
             
             <div>
-              <p className="text-sm text-purple-200 mb-1">Bloco:</p>
+              <p className="text-sm text-purple-200 mb-1">Block:</p>
               <p className="text-sm text-white">{token.blockHeight}</p>
             </div>
           </div>
@@ -200,7 +219,7 @@ const TokenItem = ({ token }) => {
               className="flex items-center gap-1 text-xs text-purple-300 hover:text-purple-100"
             >
               <ExternalLink className="w-3 h-3" /> 
-              Ver no Solscan
+              View on Solscan
             </a>
           </div>
         </div>
@@ -209,13 +228,18 @@ const TokenItem = ({ token }) => {
   );
 };
 
-// Componente para Metadado na lista
+
+// ==================================================================
+// Metadata Item Component
+// Displays metadata update information with expandable details such as token address, updater, changes, and metadata URI.
+// ==================================================================
 const MetadataItem = ({ metadata }) => {
   const [expanded, setExpanded] = useState(false);
   
+  // Copy provided text to the clipboard and alert the user.
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    alert("Copiado para a área de transferência!");
+    alert("Copied to clipboard!");
   };
 
   return (
@@ -230,7 +254,7 @@ const MetadataItem = ({ metadata }) => {
           <div>
             <p className="text-white font-medium">{metadata.name} ({metadata.symbol})</p>
             <p className="text-sm text-purple-300">
-              Atualizado em: {new Date(metadata.updatedAt).toLocaleString()}
+              Updated on: {new Date(metadata.updatedAt).toLocaleString()}
             </p>
           </div>
         </div>
@@ -245,7 +269,7 @@ const MetadataItem = ({ metadata }) => {
         <div className="mt-4 p-3 bg-purple-900/30 rounded-lg">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-purple-200 mb-1">Endereço do Token:</p>
+              <p className="text-sm text-purple-200 mb-1">Token Address:</p>
               <div className="flex items-center gap-2">
                 <code className="text-xs bg-purple-900/50 p-1 rounded font-mono text-purple-100 break-all">
                   {metadata.tokenAddress}
@@ -260,7 +284,7 @@ const MetadataItem = ({ metadata }) => {
             </div>
             
             <div>
-              <p className="text-sm text-purple-200 mb-1">Atualizador:</p>
+              <p className="text-sm text-purple-200 mb-1">Updater:</p>
               <div className="flex items-center gap-2">
                 <code className="text-xs bg-purple-900/50 p-1 rounded font-mono text-purple-100">
                   {metadata.updater.slice(0, 4)}...{metadata.updater.slice(-4)}
@@ -276,14 +300,14 @@ const MetadataItem = ({ metadata }) => {
           </div>
           
           <div className="mt-4">
-            <p className="text-sm text-purple-200 mb-1">Alterações:</p>
+            <p className="text-sm text-purple-200 mb-1">Changes:</p>
             <div className="text-xs bg-purple-900/50 p-2 rounded text-purple-100 max-h-32 overflow-auto">
               <pre>{JSON.stringify(metadata.changes, null, 2)}</pre>
             </div>
           </div>
           
           <div className="mt-4">
-            <p className="text-sm text-purple-200 mb-1">URI de Metadados:</p>
+            <p className="text-sm text-purple-200 mb-1">Metadata URI:</p>
             <div className="flex items-center gap-2">
               <input 
                 type="text" 
@@ -308,7 +332,7 @@ const MetadataItem = ({ metadata }) => {
               className="flex items-center gap-1 text-xs text-purple-300 hover:text-purple-100"
             >
               <ExternalLink className="w-3 h-3" /> 
-              Ver Metadados
+              View Metadata
             </a>
             <a 
               href={`https://solscan.io/token/${metadata.tokenAddress}`} 
@@ -317,7 +341,7 @@ const MetadataItem = ({ metadata }) => {
               className="flex items-center gap-1 text-xs text-purple-300 hover:text-purple-100"
             >
               <ExternalLink className="w-3 h-3" /> 
-              Ver no Solscan
+              View on Solscan
             </a>
           </div>
         </div>
@@ -326,12 +350,19 @@ const MetadataItem = ({ metadata }) => {
   );
 };
 
+
+// ==================================================================
+// Admin Page Component
+// Main component for admin functionalities including dashboard, logs, tokens, and metadata updates.
+// ==================================================================
 export default function AdminPage() {
   const navigate = useNavigate();
   const { publicKey, disconnect } = useWallet();
   const { connection } = useConnection();
   
-  // Estados
+  // ==================================================================
+  // Component State Definitions
+  // ==================================================================
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -348,7 +379,9 @@ export default function AdminPage() {
   const [logFilter, setLogFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Verificar se é admin usando a carteira conectada
+  // ==================================================================
+  // Verify Admin Status using the connected wallet
+  // ==================================================================
   useEffect(() => {
     const checkAdmin = async () => {
       if (!publicKey) {
@@ -358,7 +391,7 @@ export default function AdminPage() {
       }
 
       try {
-        // Requisição para verificar se é admin
+        // Request to verify admin status
         const response = await fetch("http://localhost:3001/admin/auth", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -372,11 +405,11 @@ export default function AdminPage() {
           loadDashboardData();
         } else {
           setIsAdmin(false);
-          // Redirecionar se não for admin
+          // Redirect if not an admin
           navigate("/");
         }
       } catch (error) {
-        console.error("Erro ao verificar admin:", error);
+        console.error("Error verifying admin:", error);
         setIsAdmin(false);
       } finally {
         setIsLoading(false);
@@ -386,7 +419,9 @@ export default function AdminPage() {
     checkAdmin();
   }, [publicKey, navigate]);
 
-  // Carregar dados do dashboard
+  // ==================================================================
+  // Load Dashboard Statistics Data
+  // ==================================================================
   const loadDashboardData = async () => {
     try {
       const response = await fetch("http://localhost:3001/admin/stats", {
@@ -401,11 +436,13 @@ export default function AdminPage() {
         setStats(data.stats);
       }
     } catch (error) {
-      console.error("Erro ao carregar estatísticas:", error);
+      console.error("Error loading statistics:", error);
     }
   };
 
-  // Carregar logs
+  // ==================================================================
+  // Load Logs Data
+  // ==================================================================
   const loadLogs = async (page = 1, filter = "") => {
     try {
       const response = await fetch("http://localhost:3001/admin/logs", {
@@ -427,16 +464,18 @@ export default function AdminPage() {
         setCurrentPage(data.page);
       }
     } catch (error) {
-      console.error("Erro ao carregar logs:", error);
+      console.error("Error loading logs:", error);
     }
   };
 
-  // Carregar tokens
+  // ==================================================================
+  // Load Tokens Data
+  // ==================================================================
   const loadTokens = async () => {
     try {
       setIsLoading(true);
       
-      // Simular dados para demonstração - em produção, seria uma chamada à API real
+      // Simulate data for demonstration - in production, this would be an actual API call
       const mockTokens = [
         {
           name: "Sample Token",
@@ -447,7 +486,7 @@ export default function AdminPage() {
           decimals: 9,
           fee: 0.01,
           blockHeight: 123456789,
-          createdAt: new Date().getTime() - 86400000 * 3 // 3 dias atrás
+          createdAt: new Date().getTime() - 86400000 * 3 // 3 days ago
         },
         {
           name: "Meme Coin",
@@ -458,7 +497,7 @@ export default function AdminPage() {
           decimals: 9,
           fee: 0.01,
           blockHeight: 123456790,
-          createdAt: new Date().getTime() - 86400000 * 2 // 2 dias atrás
+          createdAt: new Date().getTime() - 86400000 * 2 // 2 days ago
         },
         {
           name: "Utility Token",
@@ -469,14 +508,14 @@ export default function AdminPage() {
           decimals: 6,
           fee: 0.01,
           blockHeight: 123456791,
-          createdAt: new Date().getTime() - 86400000 // 1 dia atrás
+          createdAt: new Date().getTime() - 86400000 // 1 day ago
         }
       ];
       
       setTokens(mockTokens);
       setIsLoading(false);
       
-      // Em produção, seria algo como:
+      // In production, you might use:
       /*
       const response = await fetch("http://localhost:3001/admin/tokens", {
         method: "POST",
@@ -491,50 +530,52 @@ export default function AdminPage() {
       }
       */
     } catch (error) {
-      console.error("Erro ao carregar tokens:", error);
+      console.error("Error loading tokens:", error);
       setIsLoading(false);
     }
   };
 
-  // Carregar metadados
+  // ==================================================================
+  // Load Metadata Updates Data
+  // ==================================================================
   const loadMetadataUpdates = async () => {
     try {
       setIsLoading(true);
       
-      // Simular dados para demonstração - em produção, seria uma chamada à API real
+      // Simulate data for demonstration - in production, this would be an actual API call
       const mockMetadata = [
         {
           name: "Sample Token",
           symbol: "SMPL",
           tokenAddress: "8xn5Qm97zQoghRg3ATrAcD7ugXnbYnFZqJHQDm8UK11p",
           updater: "AaXs7cLGcSVAsEt8QxstVrqhLhYN2iGhFNnHUyGxYXpX",
-          updateType: "Criação",
+          updateType: "Creation",
           changes: {
             name: { old: null, new: "Sample Token" },
             symbol: { old: null, new: "SMPL" },
             description: { old: null, new: "A sample token for demonstration" }
           },
           uri: "https://arweave.net/metadata/sample-token",
-          updatedAt: new Date().getTime() - 86400000 * 3 // 3 dias atrás
+          updatedAt: new Date().getTime() - 86400000 * 3 // 3 days ago
         },
         {
           name: "Meme Coin",
           symbol: "MEME",
           tokenAddress: "4CKDvPhaEDevKTHSc2iWyvjqKKB4ZwEXHxwL3PS8jSLa",
           updater: "BbXs7cLGcSVAsEt8QxstVrqhLhYN2iGhFNnHUyGxYXpX",
-          updateType: "Atualização de Imagem",
+          updateType: "Image Update",
           changes: {
             image: { old: "https://old-image.com", new: "https://new-image.com" }
           },
           uri: "https://arweave.net/metadata/meme-coin",
-          updatedAt: new Date().getTime() - 86400000 * 2 // 2 dias atrás
+          updatedAt: new Date().getTime() - 86400000 * 2 // 2 days ago
         },
         {
           name: "Utility Token",
           symbol: "UTIL",
           tokenAddress: "5cL2WVQGWnxpe9AsEt8QxstVrqhLhYN2iGhFNnHUyGxY",
           updater: "CcXs7cLGcSVAsEt8QxstVrqhLhYN2iGhFNnHUyGxYXpX",
-          updateType: "Atualização Completa",
+          updateType: "Complete Update",
           changes: {
             name: { old: "Old Utility", new: "Utility Token" },
             symbol: { old: "OLD", new: "UTIL" },
@@ -542,14 +583,14 @@ export default function AdminPage() {
             website: { old: null, new: "https://utility-token.com" }
           },
           uri: "https://arweave.net/metadata/utility-token",
-          updatedAt: new Date().getTime() - 86400000 // 1 dia atrás
+          updatedAt: new Date().getTime() - 86400000 // 1 day ago
         }
       ];
       
       setMetadataUpdates(mockMetadata);
       setIsLoading(false);
       
-      // Em produção, seria algo como:
+      // In production, you might use:
       /*
       const response = await fetch("http://localhost:3001/admin/metadata-updates", {
         method: "POST",
@@ -564,26 +605,32 @@ export default function AdminPage() {
       }
       */
     } catch (error) {
-      console.error("Erro ao carregar atualizações de metadados:", error);
+      console.error("Error loading metadata updates:", error);
       setIsLoading(false);
     }
   };
 
-  // Trocar de página de logs
+  // ==================================================================
+  // Change the current log page and load logs for that page
+  // ==================================================================
   const changePage = (page) => {
     if (page < 1 || page > totalPages) return;
     setCurrentPage(page);
     loadLogs(page, logFilter);
   };
 
-  // Filtrar logs por tipo
+  // ==================================================================
+  // Filter logs by type and load the first page of filtered logs
+  // ==================================================================
   const filterLogs = (type) => {
     setLogFilter(type);
     setCurrentPage(1);
     loadLogs(1, type);
   };
 
-  // Atualizar dados com base na página ativa
+  // ==================================================================
+  // Refresh Data based on the currently active page
+  // ==================================================================
   const refreshData = () => {
     switch (activePage) {
       case "dashboard":
@@ -603,23 +650,27 @@ export default function AdminPage() {
     }
   };
 
-  // Carregar dados quando a página ativa mudar
+  // ==================================================================
+  // Load data when the active page changes and admin is verified
+  // ==================================================================
   useEffect(() => {
     if (isAdmin) {
       refreshData();
     }
   }, [activePage, isAdmin]);
 
-  // Se não estiver logado, exibir tela de login
+  // ==================================================================
+  // If wallet is not connected, display the login screen
+  // ==================================================================
   if (!publicKey) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B0120]">
         <div className="w-full max-w-md p-8 bg-purple-900/20 backdrop-blur-sm rounded-xl border border-purple-500/20">
           <h1 className="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            Área do Administrador
+            Admin Area
           </h1>
           <p className="text-center text-purple-300 mb-6">
-            Conecte sua carteira para acessar a área administrativa.
+            Connect your wallet to access the admin area.
           </p>
           
           <div className="flex justify-center">
@@ -646,41 +697,47 @@ export default function AdminPage() {
     );
   }
 
-  // Se estiver carregando, exibir loading
+  // ==================================================================
+  // If loading, display a loading spinner
+  // ==================================================================
   if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B0120]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
-        <p className="mt-4 text-purple-300">Carregando...</p>
+        <p className="mt-4 text-purple-300">Loading...</p>
       </div>
     );
   }
 
-  // Se não for admin, redirecionar (já tratado no useEffect)
+  // ==================================================================
+  // If not an admin, do not render the page (redirection already handled)
+  // ==================================================================
   if (!isAdmin) {
     return null;
   }
 
-  // Render dashboard
+  // ==================================================================
+  // Render the Dashboard Section
+  // ==================================================================
   const renderDashboard = () => (
     <div className="mb-10">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
         <StatCard
-          title="Tokens Criados"
+          title="Tokens Created"
           value={stats.tokens_created}
           icon={<Coins className="w-6 h-6 text-purple-400" />}
           change={3.2}
           color="purple"
         />
         <StatCard
-          title="Metadados Atualizados"
+          title="Metadata Updates"
           value={stats.metadata_updates}
           icon={<FileText className="w-6 h-6 text-pink-400" />}
           change={1.8}
           color="pink"
         />
         <StatCard
-          title="Taxas Coletadas (SOL)"
+          title="Service Fees Collected (SOL)"
           value={stats.service_fees_collected.toFixed(4)}
           icon={<Coins className="w-6 h-6 text-amber-400" />}
           change={5.1}
@@ -691,28 +748,28 @@ export default function AdminPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-purple-900/20 backdrop-blur-sm p-6 rounded-xl border border-purple-500/20">
           <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-purple-400" /> Atividade Recente
+            <Activity className="w-5 h-5 text-purple-400" /> Recent Activity
           </h3>
           <div className="space-y-4">
             {logs.slice(0, 5).map((log) => (
               <LogItem key={log.id} log={log} />
             ))}
             {logs.length === 0 && (
-              <p className="text-purple-300 text-sm">Nenhum log disponível.</p>
+              <p className="text-purple-300 text-sm">No logs available.</p>
             )}
           </div>
         </div>
 
         <div className="bg-purple-900/20 backdrop-blur-sm p-6 rounded-xl border border-purple-500/20">
           <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-purple-400" /> Alertas do Sistema
+            <AlertCircle className="w-5 h-5 text-purple-400" /> System Alerts
           </h3>
           <div className="space-y-4">
             {logs.filter(log => log.type === "error").slice(0, 5).map((log) => (
               <LogItem key={log.id} log={log} />
             ))}
             {logs.filter(log => log.type === "error").length === 0 && (
-              <p className="text-green-400 text-sm">Nenhum erro ou alerta ativo.</p>
+              <p className="text-green-400 text-sm">No active errors or alerts.</p>
             )}
           </div>
         </div>
@@ -720,12 +777,14 @@ export default function AdminPage() {
     </div>
   );
 
-  // Render logs
+  // ==================================================================
+  // Render the Logs Section with search and pagination
+  // ==================================================================
   const renderLogs = () => (
     <div>
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div className="flex items-center gap-2">
-          <h2 className="text-xl font-bold text-white">Logs do Sistema</h2>
+          <h2 className="text-xl font-bold text-white">System Logs</h2>
           <button
             onClick={refreshData}
             className="p-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 transition-colors"
@@ -742,7 +801,7 @@ export default function AdminPage() {
             <input
               type="text"
               className="pl-10 pr-4 py-2 bg-purple-900/30 border border-purple-500/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40"
-              placeholder="Buscar logs..."
+              placeholder="Search logs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -757,7 +816,7 @@ export default function AdminPage() {
                   : "bg-purple-500/20 text-purple-300 hover:bg-purple-500/30"
               }`}
             >
-              Todos
+              All
             </button>
             <button
               onClick={() => filterLogs("success")}
@@ -767,7 +826,7 @@ export default function AdminPage() {
                   : "bg-green-500/20 text-green-300 hover:bg-green-500/30"
               }`}
             >
-              Sucesso
+              Success
             </button>
             <button
               onClick={() => filterLogs("error")}
@@ -777,7 +836,7 @@ export default function AdminPage() {
                   : "bg-red-500/20 text-red-300 hover:bg-red-500/30"
               }`}
             >
-              Erros
+              Errors
             </button>
             <button
               onClick={() => filterLogs("info")}
@@ -799,12 +858,12 @@ export default function AdminPage() {
             <LogItem key={log.id} log={log} />
           ))}
           {logs.length === 0 && (
-            <p className="text-purple-300 text-center py-6">Nenhum log encontrado.</p>
+            <p className="text-purple-300 text-center py-6">No logs found.</p>
           )}
         </div>
       </div>
       
-      {/* Paginação */}
+      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center mt-6">
           <div className="flex items-center gap-2">
@@ -817,7 +876,7 @@ export default function AdminPage() {
             </button>
             
             <span className="px-4 py-2 bg-purple-900/30 rounded-lg text-purple-200">
-              Página {currentPage} de {totalPages}
+              Page {currentPage} of {totalPages}
             </span>
             
             <button
@@ -833,22 +892,25 @@ export default function AdminPage() {
     </div>
   );
 
+  // ==================================================================
+  // Main Render of the Admin Page
+  // ==================================================================
   return (
     <div className="min-h-screen bg-[#0B0120] text-white">
-      {/* Overlay gradients */}
+      {/* Background Overlay Gradients */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute -top-1/4 -left-1/4 w-2/3 h-1/2 bg-purple-900/20 rounded-full blur-[120px]" />
         <div className="absolute -top-1/4 right-0 w-2/4 h-2/3 bg-pink-900/20 rounded-full blur-[120px]" />
         <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 w-1/2 h-1/2 bg-purple-800/20 rounded-full blur-[160px]" />
       </div>
 
-      {/* Header */}
+      {/* Header Section */}
       <header className="fixed top-0 left-0 right-0 bg-[#0B0120]/80 backdrop-blur-md border-b border-purple-500/20 p-4 z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-          <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-  Solana Builder Admin
-</span>
+            <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              Solana Builder Admin
+            </span>
           </div>
           
           <div className="flex items-center gap-4">
@@ -861,15 +923,15 @@ export default function AdminPage() {
               className="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 text-sm font-medium flex items-center gap-2 transition-all"
             >
               <LogOut className="w-4 h-4" />
-              Desconectar
+              Disconnect
             </button>
           </div>
         </div>
       </header>
 
-      {/* Sidebar + Content */}
+      {/* Sidebar and Main Content */}
       <div className="pt-20 flex min-h-screen">
-        {/* Sidebar */}
+        {/* Sidebar Navigation */}
         <div className="w-64 bg-[#0B0120]/80 backdrop-blur-md border-r border-purple-500/20 p-6 fixed left-0 top-20 bottom-0">
           <div className="space-y-2">
             <button
@@ -899,22 +961,22 @@ export default function AdminPage() {
               } transition-colors`}
             >
               <FileText className="w-5 h-5" />
-              Logs do Sistema
+              System Logs
             </button>
           </div>
         </div>
 
-        {/* Main Content */}
+        {/* Main Content Area */}
         <div className="flex-1 ml-64 p-6">
           <div className="max-w-7xl">
             <div className="mb-6">
               <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                {activePage === "dashboard" ? "Dashboard" : "Logs do Sistema"}
+                {activePage === "dashboard" ? "Dashboard" : "System Logs"}
               </h1>
               <p className="text-purple-300 mt-1">
                 {activePage === "dashboard"
-                  ? "Estatísticas e visão geral da plataforma"
-                  : "Registro detalhado das atividades do sistema"}
+                  ? "Platform statistics and overview"
+                  : "Detailed record of system activities"}
               </p>
             </div>
 
