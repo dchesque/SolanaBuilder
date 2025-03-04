@@ -102,6 +102,48 @@ function UpdateMetadataForm() {
   const wallet = useWallet();
   const { publicKey, sendTransaction } = wallet;
 
+  // Helper function to check if wallet is Phantom and get provider
+  const getPhantomProvider = () => {
+    if (wallet && wallet.adapter && wallet.adapter.name === 'Phantom') {
+      return wallet.adapter;
+    }
+    return null;
+  };
+
+  // Helper function for using Phantom's signAndSendTransaction
+  const signAndSendTransactionWithPhantom = async (transaction) => {
+    const phantomProvider = getPhantomProvider();
+    
+    if (!phantomProvider) {
+      console.warn("Not using Phantom wallet. Using standard transaction method instead.");
+      transaction.feePayer = publicKey;
+      transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      return await sendTransaction(transaction, connection);
+    }
+    
+    // Make sure transaction has the required properties
+    transaction.feePayer = publicKey;
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    
+    try {
+      logWithDetails("Using Phantom's recommended signAndSendTransaction method for better security screening");
+      
+      // Use Phantom's specific method to avoid suspicious transaction warnings
+      const { signature } = await phantomProvider.signAndSendTransaction(transaction);
+      return signature;
+    } catch (error) {
+      logWithDetails("Error using Phantom's signAndSendTransaction:", error);
+      
+      // If the Phantom-specific method fails, we can try the fallback
+      if (error.message && error.message.includes("signAndSendTransaction is not a function")) {
+        console.warn("Phantom wallet doesn't support signAndSendTransaction. Falling back to regular method.");
+        return await sendTransaction(transaction, connection);
+      }
+      
+      throw error;
+    }
+  };
+
   // Tab state
   const [activeTab, setActiveTab] = useState("token-details");
   
@@ -337,15 +379,10 @@ function UpdateMetadataForm() {
         })
       );
       
-      
-      // Set up transaction
-      transaction.feePayer = publicKey;
-      const blockhash = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash.blockhash;
-      
-      // Send transaction
+      // Use Phantom's recommended signAndSendTransaction method
       logWithDetails('Sending service fee transaction');
-      const signature = await sendTransaction(transaction, connection);
+      const signature = await signAndSendTransactionWithPhantom(transaction);
+      
       logWithDetails('Service fee - Transaction signature:', signature);
       
       // Wait for confirmation with retry
@@ -354,8 +391,8 @@ function UpdateMetadataForm() {
         try {
           await connection.confirmTransaction({
             signature,
-            blockhash: blockhash.blockhash,
-            lastValidBlockHeight: blockhash.lastValidBlockHeight
+            blockhash: (await connection.getLatestBlockhash()).blockhash,
+            lastValidBlockHeight: (await connection.getLatestBlockhash()).lastValidBlockHeight
           }, 'confirmed');
           confirmed = true;
           break;
@@ -413,15 +450,15 @@ function UpdateMetadataForm() {
       }
       
       // Process service fee first with token details specific fee
-    setStatus(prev => ({
-      ...prev,
-      loading: true,
-      message: `Processing service fee for token details update (${TOKEN_DETAILS_FEE} SOL)...`,
-      error: null
-    }));
+      setStatus(prev => ({
+        ...prev,
+        loading: true,
+        message: `Processing service fee for token details update (${TOKEN_DETAILS_FEE} SOL)...`,
+        error: null
+      }));
     
-    const feeProcessed = await processServiceFee(TOKEN_DETAILS_FEE);
-    if (!feeProcessed) return;
+      const feeProcessed = await processServiceFee(TOKEN_DETAILS_FEE);
+      if (!feeProcessed) return;
       
       setStatus(prev => ({
         ...prev,
@@ -492,7 +529,8 @@ function UpdateMetadataForm() {
         logWithDetails("No metadata found. Creating metadata via metaplex.nfts().createSft()");
         
         try {
-          const newSft = await metaplex.nfts().createSft({
+          // Create a new transaction with createSft
+          const { response } = await metaplex.nfts().createSft({
             useNewMint: false,
             tokenExists: true,
             tokenOwner: publicKey,
@@ -507,7 +545,8 @@ function UpdateMetadataForm() {
             isMutable: true,
           });
           
-          logWithDetails("SFT created with metadata:", newSft);
+          logWithDetails("SFT created with metadata transaction:", response);
+          await connection.confirmTransaction(response.signature, "confirmed");
           
           setStatus(prev => ({
             ...prev,
@@ -524,25 +563,27 @@ function UpdateMetadataForm() {
         // Update existing metadata
         logWithDetails("Updating existing metadata");
         
-        const updateResponse = await retryOperation(async () => {
-          return await metaplex.nfts().update(
-            {
-              nftOrSft: currentMetadata,
-              name: formData.name,
-              symbol: formData.symbol,
-              uri: uri,
-              sellerFeeBasisPoints: currentMetadata.sellerFeeBasisPoints,
-              creators: currentMetadata.creators,
-              isMutable: true,
-              primarySaleHappened: currentMetadata.primarySaleHappened,
-              collection: currentMetadata.collection,
-            },
-            { commitment: "confirmed" }
-          );
+        // Create the update transaction
+        const updateTransaction = await metaplex.nfts().updateBuilder({
+          nftOrSft: currentMetadata,
+          name: formData.name,
+          symbol: formData.symbol,
+          uri: uri,
+          sellerFeeBasisPoints: currentMetadata.sellerFeeBasisPoints,
+          creators: currentMetadata.creators,
+          isMutable: true,
+          primarySaleHappened: currentMetadata.primarySaleHappened,
+          collection: currentMetadata.collection,
         });
+
+        // Convert to transaction for Phantom's signAndSendTransaction
+        const transaction = updateTransaction.toTransaction();
         
-        logWithDetails("Update response:", updateResponse);
-        await connection.confirmTransaction(updateResponse.response.signature, "confirmed");
+        // Sign and send using Phantom's method
+        const signature = await signAndSendTransactionWithPhantom(transaction);
+        
+        logWithDetails("Update response signature:", signature);
+        await connection.confirmTransaction(signature, "confirmed");
         logWithDetails("Update transaction confirmed");
         
         setStatus(prev => ({
@@ -691,26 +732,27 @@ function UpdateMetadataForm() {
         progress: 85
       }));
       
-      // Update existing metadata
-      const updateResponse = await retryOperation(async () => {
-        return await metaplex.nfts().update(
-          {
-            nftOrSft: currentMetadata,
-            name: currentMetadata.name,
-            symbol: currentMetadata.symbol,
-            uri: uri,
-            sellerFeeBasisPoints: currentMetadata.sellerFeeBasisPoints,
-            creators: currentMetadata.creators,
-            isMutable: true,
-            primarySaleHappened: currentMetadata.primarySaleHappened,
-            collection: currentMetadata.collection,
-          },
-          { commitment: "confirmed" }
-        );
+      // Create the update transaction
+      const updateTransaction = await metaplex.nfts().updateBuilder({
+        nftOrSft: currentMetadata,
+        name: currentMetadata.name,
+        symbol: currentMetadata.symbol,
+        uri: uri,
+        sellerFeeBasisPoints: currentMetadata.sellerFeeBasisPoints,
+        creators: currentMetadata.creators,
+        isMutable: true,
+        primarySaleHappened: currentMetadata.primarySaleHappened,
+        collection: currentMetadata.collection,
       });
+
+      // Convert to transaction for Phantom's signAndSendTransaction
+      const transaction = updateTransaction.toTransaction();
       
-      logWithDetails("Update response:", updateResponse);
-      await connection.confirmTransaction(updateResponse.response.signature, "confirmed");
+      // Sign and send using Phantom's method
+      const signature = await signAndSendTransactionWithPhantom(transaction);
+      
+      logWithDetails("Update response signature:", signature);
+      await connection.confirmTransaction(signature, "confirmed");
       logWithDetails("Update transaction confirmed");
       
       setStatus(prev => ({
@@ -849,26 +891,27 @@ function UpdateMetadataForm() {
         progress: 85
       }));
       
-      // Update existing metadata
-      const updateResponse = await retryOperation(async () => {
-        return await metaplex.nfts().update(
-          {
-            nftOrSft: currentMetadata,
-            name: currentMetadata.name,
-            symbol: currentMetadata.symbol,
-            uri: uri,
-            sellerFeeBasisPoints: currentMetadata.sellerFeeBasisPoints,
-            creators: currentMetadata.creators,
-            isMutable: true,
-            primarySaleHappened: currentMetadata.primarySaleHappened,
-            collection: currentMetadata.collection,
-          },
-          { commitment: "confirmed" }
-        );
+      // Create the update transaction
+      const updateTransaction = await metaplex.nfts().updateBuilder({
+        nftOrSft: currentMetadata,
+        name: currentMetadata.name,
+        symbol: currentMetadata.symbol,
+        uri: uri,
+        sellerFeeBasisPoints: currentMetadata.sellerFeeBasisPoints,
+        creators: currentMetadata.creators,
+        isMutable: true,
+        primarySaleHappened: currentMetadata.primarySaleHappened,
+        collection: currentMetadata.collection,
       });
+
+      // Convert to transaction for Phantom's signAndSendTransaction
+      const transaction = updateTransaction.toTransaction();
       
-      logWithDetails("Update response:", updateResponse);
-      await connection.confirmTransaction(updateResponse.response.signature, "confirmed");
+      // Sign and send using Phantom's method
+      const signature = await signAndSendTransactionWithPhantom(transaction);
+      
+      logWithDetails("Update response signature:", signature);
+      await connection.confirmTransaction(signature, "confirmed");
       logWithDetails("Update transaction confirmed");
       
       setStatus(prev => ({
@@ -961,7 +1004,8 @@ function UpdateMetadataForm() {
         </div>
         {formData.mintAddress && (
           <div className="mt-2 flex items-center gap-2">
-            <a
+             
+             <a
               href={`https://solscan.io/token/${formData.mintAddress}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -1068,8 +1112,17 @@ function UpdateMetadataForm() {
 
           {/* Estimated Cost */}
           <div className="rounded-xl bg-[#1D0F35] border border-purple-500/20 p-4">
-  <CostEstimate feeType="token-details" />
-</div>
+            <CostEstimate feeType="token-details" />
+          </div>
+
+          {/* Phantom wallet recommendation notice */}
+          {!getPhantomProvider() && (
+            <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+              <p className="text-sm text-center text-yellow-200">
+                ⚠️ For the best experience and to avoid security warnings, we recommend using the Phantom wallet.
+              </p>
+            </div>
+          )}
 
           {/* Status Messages */}
           {status.message && (
@@ -1150,8 +1203,17 @@ function UpdateMetadataForm() {
 
           {/* Estimated Cost */}
           <div className="rounded-xl bg-[#1D0F35] border border-purple-500/20 p-4">
-  <CostEstimate feeType="website-image" />
-</div>
+            <CostEstimate feeType="website-image" />
+          </div>
+
+          {/* Phantom wallet recommendation notice */}
+          {!getPhantomProvider() && (
+            <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+              <p className="text-sm text-center text-yellow-200">
+                ⚠️ For the best experience and to avoid security warnings, we recommend using the Phantom wallet.
+              </p>
+            </div>
+          )}
 
           {/* Status Messages */}
           {status.message && (
@@ -1240,8 +1302,17 @@ function UpdateMetadataForm() {
 
           {/* Estimated Cost */}
           <div className="rounded-xl bg-[#1D0F35] border border-purple-500/20 p-4">
-  <CostEstimate feeType="social-links" />
-</div>
+            <CostEstimate feeType="social-links" />
+          </div>
+
+          {/* Phantom wallet recommendation notice */}
+          {!getPhantomProvider() && (
+            <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+              <p className="text-sm text-center text-yellow-200">
+                ⚠️ For the best experience and to avoid security warnings, we recommend using the Phantom wallet.
+              </p>
+            </div>
+          )}
 
           {/* Status Messages */}
           {status.message && (

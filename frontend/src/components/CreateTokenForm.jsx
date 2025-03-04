@@ -30,7 +30,8 @@ const TOKEN_METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzj
 
 export default function CreateTokenForm() {
   const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
+  const wallet = useWallet();
+  const { publicKey, sendTransaction } = wallet;
   const navigate = useNavigate();
 
   const [nomeToken, setNomeToken] = useState("");
@@ -45,20 +46,61 @@ export default function CreateTokenForm() {
     freezable: false,
   });
 
-  // Adicione aqui os novos métodos de validação
-const validateTokenName = (name) => {
-  if (!name) return "";
-  if (name.length > 32) {
-    return "Token name must be 32 characters or less.";
-  }
-  return "";
-};
-
-// Chame a validação antes de usar
-const tokenNameError = validateTokenName(nomeToken);
-
   // Variables to store the created token data
   const [createdTokenData, setCreatedTokenData] = useState(null);
+
+  // Helper function to check if wallet is Phantom and get provider
+  const getPhantomProvider = () => {
+    if (wallet && wallet.adapter && wallet.adapter.name === 'Phantom') {
+      return wallet.adapter;
+    }
+    return null;
+  };
+
+  // Helper function for using Phantom's signAndSendTransaction
+  const signAndSendTransactionWithPhantom = async (transaction) => {
+    const phantomProvider = getPhantomProvider();
+    
+    if (!phantomProvider) {
+      console.warn("Not using Phantom wallet. Using standard transaction method instead.");
+      transaction.feePayer = publicKey;
+      transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      return await sendTransaction(transaction, connection);
+    }
+    
+    // Make sure transaction has the required properties
+    transaction.feePayer = publicKey;
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    
+    try {
+      console.log("Using Phantom's recommended signAndSendTransaction method for better security screening");
+      
+      // Use Phantom's specific method to avoid suspicious transaction warnings
+      const { signature } = await phantomProvider.signAndSendTransaction(transaction);
+      return signature;
+    } catch (error) {
+      console.error("Error using Phantom's signAndSendTransaction:", error);
+      
+      // If the Phantom-specific method fails, we can try the fallback
+      if (error.message && error.message.includes("signAndSendTransaction is not a function")) {
+        console.warn("Phantom wallet doesn't support signAndSendTransaction. Falling back to regular method.");
+        return await sendTransaction(transaction, connection);
+      }
+      
+      throw error;
+    }
+  };
+
+  // Validation methods
+  const validateTokenName = (name) => {
+    if (!name) return "";
+    if (name.length > 32) {
+      return "Token name must be 32 characters or less.";
+    }
+    return "";
+  };
+
+  const tokenNameError = validateTokenName(nomeToken);
 
   const validateTicker = (ticker) => {
     if (!ticker) return "";
@@ -142,10 +184,8 @@ const tokenNameError = validateTokenName(nomeToken);
         })
       );
   
-      transaction.feePayer = publicKey;
-      transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-  
-      const signature = await sendTransaction(transaction, connection);
+      // Use Phantom's recommended signAndSendTransaction method
+      const signature = await signAndSendTransactionWithPhantom(transaction);
       
       console.log('Transaction Signature:', signature);
   
@@ -258,12 +298,12 @@ const tokenNameError = validateTokenName(nomeToken);
         mintToIx
       );
 
-      transaction.feePayer = publicKey;
-      transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
+      // Partially sign with the mintKeypair (this doesn't change with Phantom integration)
       transaction.partialSign(mintKeypair);
 
-      const signature = await sendTransaction(transaction, connection);
+      // Use Phantom's recommended signAndSendTransaction method
+      const signature = await signAndSendTransactionWithPhantom(transaction);
+      
       console.log('Token created successfully! Signature:', signature);
 
       try {
@@ -311,45 +351,44 @@ const tokenNameError = validateTokenName(nomeToken);
   };
 
   // STEP 3: Add metadata to the token using Metaplex
-// Updated handleAddMetadata function with explicit rent handling
-const handleAddMetadata = async (e) => {
-  e.preventDefault();
+  const handleAddMetadata = async (e) => {
+    e.preventDefault();
 
-  if (!publicKey || !createdTokenData) {
-    setMessage("Token data not found. Please create the token first.");
-    return;
-  }
+    if (!publicKey || !createdTokenData) {
+      setMessage("Token data not found. Please create the token first.");
+      return;
+    }
 
-  setLoading(true);
-  setMessage("Calculating costs and adding metadata to the token...");
+    setLoading(true);
+    setMessage("Calculating costs and adding metadata to the token...");
 
-  try {
-    // Initialize Metaplex
-    const metaplex = new Metaplex(connection);
-    metaplex.use(walletAdapterIdentity({ publicKey, sendTransaction }));
+    try {
+      // Initialize Metaplex
+      const metaplex = new Metaplex(connection);
+      metaplex.use(walletAdapterIdentity({ publicKey, sendTransaction }));
 
-    console.log('Preparing on-chain metadata creation...');
-    
-    const mintAddress = new PublicKey(createdTokenData.mintAddress);
-    
-    // Find the metadata PDA
-    const metadataPDA = await metaplex.nfts().pdas().metadata({ mint: mintAddress });
-    
-    console.log('Metadata PDA address:', metadataPDA.toBase58());
-    
-    // Prepare data for the metadata instruction
-    const metadataData = {
-      name: createdTokenData.name,
-      symbol: createdTokenData.symbol,
-      uri: "", // Empty URI, not uploading to Arweave
-      sellerFeeBasisPoints: 0,
-      creators: null,
-      collection: null,
-      uses: null
-    };
-    
-    // More precise metadata size calculation
-    const metadataSize = 1 + // key
+      console.log('Preparing on-chain metadata creation...');
+      
+      const mintAddress = new PublicKey(createdTokenData.mintAddress);
+      
+      // Find the metadata PDA
+      const metadataPDA = await metaplex.nfts().pdas().metadata({ mint: mintAddress });
+      
+      console.log('Metadata PDA address:', metadataPDA.toBase58());
+      
+      // Prepare data for the metadata instruction
+      const metadataData = {
+        name: createdTokenData.name,
+        symbol: createdTokenData.symbol,
+        uri: "", // Empty URI, not uploading to Arweave
+        sellerFeeBasisPoints: 0,
+        creators: null,
+        collection: null,
+        uses: null
+      };
+      
+      // More precise metadata size calculation
+      const metadataSize = 1 + // key
                      32 + // mint
                      32 + // update authority
                      4 + createdTokenData.name.length + // name
@@ -360,97 +399,92 @@ const handleAddMetadata = async (e) => {
                      1 + // collection
                      1; // uses
   
-    console.log('Estimated metadata size (bytes):', metadataSize);
-    
-    // Get exact rent exemption amount
-    const rentExemptionAmount = await connection.getMinimumBalanceForRentExemption(metadataSize);
-    
-    console.log('Rent exemption cost (lamports):', rentExemptionAmount);
-    console.log('Rent exemption cost (SOL):', rentExemptionAmount / 1_000_000_000);
-    
-    // Create a transaction with an explicit transfer for rent
-    const transaction = new Transaction();
-    
-    // Add a system transfer instruction for rent exemption
-    const rentTransferIx = SystemProgram.transfer({
-      fromPubkey: publicKey,
-      toPubkey: metadataPDA, // Transfer rent directly to the metadata account
-      lamports: rentExemptionAmount
-    });
-    transaction.add(rentTransferIx);
-    
-    // Create metadata instruction
-    const createMetadataInstruction = createCreateMetadataAccountV3Instruction(
-      {
-        metadata: metadataPDA,
-        mint: mintAddress,
-        mintAuthority: publicKey,
-        payer: publicKey,
-        updateAuthority: publicKey,
-      },
-      {
-        createMetadataAccountArgsV3: {
-          data: metadataData,
-          isMutable: true,
-          collectionDetails: null
-        }
-      }
-    );
-    transaction.add(createMetadataInstruction);
-    
-    transaction.feePayer = publicKey;
-    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-    
-    // Estimate fees
-    const estimatedFees = await transaction.getEstimatedFee(connection);
-    
-    console.log('Total estimated transaction cost (SOL):', 
-      (rentExemptionAmount + estimatedFees) / 1_000_000_000
-    );
-    
-    // Send the transaction
-    const signature = await sendTransaction(transaction, connection);
-    console.log('Metadata created successfully! Signature:', signature);
-    
-    // Await confirmation
-    await connection.confirmTransaction(signature, "confirmed");
-    
-    // Navigate to token details page
-    navigate("/token-details", {
-      state: {
-        tokenAddress: createdTokenData.mintAddress,
-        tokenName: createdTokenData.name,
-        ticker: createdTokenData.symbol,
-        supply: createdTokenData.supply,
-        decimals: createdTokenData.decimals
-      }
-    });
-
-    setMessage(`Token and metadata created successfully!`);
-  } catch (err) {
-    console.error('Detailed error adding metadata:', err);
-    
-    if (err.message.includes("already has metadata") || err.message.includes("already exists")) {
-      setMessage("It seems metadata already exists. Redirecting to token details page...");
+      console.log('Estimated metadata size (bytes):', metadataSize);
       
-      setTimeout(() => {
-        navigate("/token-details", {
-          state: {
-            tokenAddress: createdTokenData.mintAddress,
-            tokenName: createdTokenData.name,
-            ticker: createdTokenData.symbol,
-            supply: createdTokenData.supply,
-            decimals: createdTokenData.decimals
+      // Get exact rent exemption amount
+      const rentExemptionAmount = await connection.getMinimumBalanceForRentExemption(metadataSize);
+      
+      console.log('Rent exemption cost (lamports):', rentExemptionAmount);
+      console.log('Rent exemption cost (SOL):', rentExemptionAmount / 1_000_000_000);
+      
+      // Create a transaction with an explicit transfer for rent
+      const transaction = new Transaction();
+      
+      // Add a system transfer instruction for rent exemption
+      const rentTransferIx = SystemProgram.transfer({
+        fromPubkey: publicKey,
+        toPubkey: metadataPDA, // Transfer rent directly to the metadata account
+        lamports: rentExemptionAmount
+      });
+      transaction.add(rentTransferIx);
+      
+      // Create metadata instruction
+      const createMetadataInstruction = createCreateMetadataAccountV3Instruction(
+        {
+          metadata: metadataPDA,
+          mint: mintAddress,
+          mintAuthority: publicKey,
+          payer: publicKey,
+          updateAuthority: publicKey,
+        },
+        {
+          createMetadataAccountArgsV3: {
+            data: metadataData,
+            isMutable: true,
+            collectionDetails: null
           }
-        });
-      }, 2000);
-    } else {
-      setMessage("Error adding metadata: " + err.message);
+        }
+      );
+      transaction.add(createMetadataInstruction);
+      
+      // Make sure transaction has sufficient space for Lighthouse security instructions
+      // This helps with passing Phantom's security checks
+      // Adding smaller transactions or leaving space would be recommended
+      
+      // Use Phantom's recommended signAndSendTransaction method
+      const signature = await signAndSendTransactionWithPhantom(transaction);
+      
+      console.log('Metadata created successfully! Signature:', signature);
+      
+      // Await confirmation
+      await connection.confirmTransaction(signature, "confirmed");
+      
+      // Navigate to token details page
+      navigate("/token-details", {
+        state: {
+          tokenAddress: createdTokenData.mintAddress,
+          tokenName: createdTokenData.name,
+          ticker: createdTokenData.symbol,
+          supply: createdTokenData.supply,
+          decimals: createdTokenData.decimals
+        }
+      });
+
+      setMessage(`Token and metadata created successfully!`);
+    } catch (err) {
+      console.error('Detailed error adding metadata:', err);
+      
+      if (err.message.includes("already has metadata") || err.message.includes("already exists")) {
+        setMessage("It seems metadata already exists. Redirecting to token details page...");
+        
+        setTimeout(() => {
+          navigate("/token-details", {
+            state: {
+              tokenAddress: createdTokenData.mintAddress,
+              tokenName: createdTokenData.name,
+              ticker: createdTokenData.symbol,
+              supply: createdTokenData.supply,
+              decimals: createdTokenData.decimals
+            }
+          });
+        }, 2000);
+      } else {
+        setMessage("Error adding metadata: " + err.message);
+      }
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // Wallet not connected
   if (!publicKey) {
@@ -630,6 +664,15 @@ const handleAddMetadata = async (e) => {
         {step <= 2 && (
           <div className="p-4 rounded-xl bg-[#1D0F35] border border-purple-500/20">
             <CostEstimate />
+          </div>
+        )}
+
+        {/* Phantom wallet recommendation notice */}
+        {!getPhantomProvider() && (
+          <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+            <p className="text-sm text-center text-yellow-200">
+              ⚠️ For the best experience and to avoid security warnings, we recommend using the Phantom wallet.
+            </p>
           </div>
         )}
 
