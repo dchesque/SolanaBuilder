@@ -214,141 +214,188 @@ export default function CreateTokenForm() {
     }
   };
 
-  // STEP 2: Create the token on the Solana network
-  const handleCreateToken = async (e) => {
-    e.preventDefault();
+  // STEP 2: Create the token on the Solana network - Fixed version
+const handleCreateToken = async (e) => {
+  e.preventDefault();
 
-    if (!publicKey) {
-      setMessage("Please connect your wallet to continue.");
-      return;
+  if (!publicKey) {
+    setMessage("Please connect your wallet to continue.");
+    return;
+  }
+
+  if (tickerError) {
+    setMessage(tickerError);
+    return;
+  }
+
+  setLoading(true);
+  setMessage("Creating token on the Solana network...");
+
+  try {
+    // Generate token mint
+    const mintKeypair = Keypair.generate();
+    console.log('Generated mint keypair:', mintKeypair.publicKey.toString());
+    
+    const lamportsForMint = await connection.getMinimumBalanceForRentExemption(MINT_SIZE);
+    console.log('Rent exemption amount (lamports):', lamportsForMint);
+
+    // Ensure supply is always at least 1000 for 9 decimals
+    let humanSupply = Number(supply);
+    if (isNaN(humanSupply) || humanSupply < 1000) {
+      humanSupply = 1000;
+      setSupply("1000");
     }
 
-    if (tickerError) {
-      setMessage(tickerError);
-      return;
-    }
+    // Always using 9 decimals
+    const tokenDecimals = 9;
+    
+    // On-chain value (convert human-readable value to actual quantity)
+    const onChainSupply = humanSupply * 10 ** tokenDecimals;
 
-    setLoading(true);
-    setMessage("Creating token on the Solana network...");
+    console.log('Creating token with the following parameters:');
+    console.log('Mint Address:', mintKeypair.publicKey.toString());
+    console.log('Name:', nomeToken);
+    console.log('Symbol:', ticker);
+    console.log('Supply:', humanSupply);
+    console.log('Decimals:', tokenDecimals);
 
-    try {
-      // Generate token mint
-      const mintKeypair = Keypair.generate();
-      const lamportsForMint = await connection.getMinimumBalanceForRentExemption(MINT_SIZE);
+    // First get a fresh blockhash before creating the transaction
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
+    console.log('Got recent blockhash:', blockhash, 'lastValidBlockHeight:', lastValidBlockHeight);
 
-      // Ensure supply is always at least 1000 for 9 decimals
-      let humanSupply = Number(supply);
-      if (isNaN(humanSupply) || humanSupply < 1000) {
-        humanSupply = 1000;
-        setSupply("1000");
-      }
+    // Create new transaction with explicit blockhash
+    const transaction = new Transaction({
+      feePayer: publicKey,
+      recentBlockhash: blockhash
+    });
 
-      // Always using 9 decimals
-      const tokenDecimals = 9;
-      
-      // On-chain value (convert human-readable value to actual quantity)
-      const onChainSupply = humanSupply * 10 ** tokenDecimals;
-
-      console.log('Creating token with the following parameters:');
-      console.log('Mint Address:', mintKeypair.publicKey.toString());
-      console.log('Name:', nomeToken);
-      console.log('Symbol:', ticker);
-      console.log('Supply:', humanSupply);
-      console.log('Decimals:', tokenDecimals);
-
-      const createAccountIx = SystemProgram.createAccount({
+    // Add instructions to the transaction
+    transaction.add(
+      SystemProgram.createAccount({
         fromPubkey: publicKey,
         newAccountPubkey: mintKeypair.publicKey,
         lamports: lamportsForMint,
         space: MINT_SIZE,
         programId: TOKEN_PROGRAM_ID,
-      });
-
-      // Initialize the mint with defined decimals
-      const initMintIx = createInitializeMintInstruction(
+      }),
+      createInitializeMintInstruction(
         mintKeypair.publicKey,
         tokenDecimals,
         publicKey,
         null
-      );
+      )
+    );
 
-      const associatedTokenAddress = await getAssociatedTokenAddress(
-        mintKeypair.publicKey,
-        publicKey
-      );
+    // Calculate the associated token address
+    const associatedTokenAddress = await getAssociatedTokenAddress(
+      mintKeypair.publicKey,
+      publicKey
+    );
+    console.log('Associated token address:', associatedTokenAddress.toString());
 
-      const createATAIx = createAssociatedTokenAccountInstruction(
+    // Add ATA and mint instructions
+    transaction.add(
+      createAssociatedTokenAccountInstruction(
         publicKey,
         associatedTokenAddress,
         publicKey,
         mintKeypair.publicKey
-      );
-
-      const mintToIx = createMintToInstruction(
+      ),
+      createMintToInstruction(
         mintKeypair.publicKey,
         associatedTokenAddress,
         publicKey,
         onChainSupply
-      );
+      )
+    );
 
-      const transaction = new Transaction().add(
-        createAccountIx,
-        initMintIx,
-        createATAIx,
-        mintToIx
-      );
+    // Sign with the mint account
+    transaction.partialSign(mintKeypair);
+    
+    // Verify transaction size is not too large
+    const serializedTransaction = transaction.serialize({verifySignatures: false});
+    console.log('Transaction size (bytes):', serializedTransaction.length);
+    
+    if (serializedTransaction.length > 1232) {
+      throw new Error("Transaction too large: " + serializedTransaction.length + " bytes");
+    }
 
-      // Partially sign with the mintKeypair (this doesn't change with Phantom integration)
-      transaction.partialSign(mintKeypair);
+    // Send the transaction
+    console.log('Sending transaction...');
+    const signature = await sendTransaction(transaction, connection, {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+      maxRetries: 5
+    });
+    
+    console.log('Transaction sent! Signature:', signature);
+    setMessage(`Transaction sent! Signature: ${signature}`);
 
-      // Use Phantom's recommended signAndSendTransaction method
-      const signature = await signAndSendTransactionWithPhantom(transaction);
+    try {
+      console.log('Confirming transaction...');
+      const confirmation = await connection.confirmTransaction({
+        signature,
+        blockhash,
+        lastValidBlockHeight
+      }, 'confirmed');
       
-      console.log('Token created successfully! Signature:', signature);
-
-      try {
-        await connection.confirmTransaction(signature, "confirmed");
+      console.log('Transaction confirmation:', confirmation);
+      
+      if (confirmation.value.err) {
+        throw new Error(`Transaction confirmed but failed: ${JSON.stringify(confirmation.value.err)}`);
+      }
+      
+      // Save token data for use in step 3
+      setCreatedTokenData({
+        mintAddress: mintKeypair.publicKey.toString(),
+        name: nomeToken,
+        symbol: ticker,
+        supply: humanSupply,
+        decimals: tokenDecimals
+      });
+      
+      setStep(3);
+      setMessage("Token created successfully! Now let's add metadata.");
+    } catch (confirmError) {
+      console.error('Error confirming transaction:', confirmError);
+      
+      // Check if it's just a timeout but transaction might have succeeded
+      if (confirmError.message.includes("was not confirmed in")) {
+        console.warn("Transaction confirmation timeout, but token may have been created.");
         
-        // Save token data for use in step 3
-        setCreatedTokenData({
-          mintAddress: mintKeypair.publicKey.toString(),
-          name: nomeToken,
-          symbol: ticker,
-          supply: humanSupply,
-          decimals: tokenDecimals
-        });
-        
-        setStep(3);
-        setMessage("Token created successfully! Now let's add metadata.");
-      } catch (confirmError) {
-        if (
-          confirmError.message &&
-          confirmError.message.includes("Transaction was not confirmed in 30.00 seconds")
-        ) {
-          console.warn("Transaction confirmation timeout, but token may have been created.");
-          
-          // Save data even on timeout since the token was likely created
-          setCreatedTokenData({
-            mintAddress: mintKeypair.publicKey.toString(),
-            name: nomeToken,
-            symbol: ticker,
-            supply: humanSupply,
-            decimals: tokenDecimals
-          });
-          
-          setStep(3);
-          setMessage("Transaction confirmation timeout, but token may have been created. Attempting to add metadata...");
-        } else {
-          throw confirmError;
+        // Try to verify if mint account exists
+        try {
+          const mintInfo = await connection.getAccountInfo(mintKeypair.publicKey);
+          if (mintInfo && mintInfo.owner.equals(TOKEN_PROGRAM_ID)) {
+            console.log('Mint account exists, proceeding despite confirmation timeout');
+            
+            // Save data even on timeout since the token was likely created
+            setCreatedTokenData({
+              mintAddress: mintKeypair.publicKey.toString(),
+              name: nomeToken,
+              symbol: ticker,
+              supply: humanSupply,
+              decimals: tokenDecimals
+            });
+            
+            setStep(3);
+            setMessage("Transaction might have succeeded. Attempting to add metadata...");
+            return;
+          }
+        } catch (checkError) {
+          console.error('Error checking mint account:', checkError);
         }
       }
-    } catch (err) {
-      console.error('Error creating token:', err);
-      setMessage("Error creating token: " + err.message);
-    } finally {
-      setLoading(false);
+      
+      throw confirmError;
     }
-  };
+  } catch (err) {
+    console.error('Detailed error creating token:', err);
+    setMessage("Error creating token: " + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // STEP 3: Add metadata to the token using Metaplex
   const handleAddMetadata = async (e) => {
