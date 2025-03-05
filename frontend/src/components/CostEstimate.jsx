@@ -123,14 +123,14 @@ const CostEstimate = ({ feeType = "default" }) => {
         <div className="space-y-2">
           
           
-{/* SERVICE FEE OCULTADO
+{/* PARTE SERVICE FEE*/}
 <div className="flex items-center justify-between">
   <span className="text-purple-300">Service Fee:</span>
   <div className="text-right">
     <div className="text-white font-medium">{formatSol(serviceFee)} SOL</div>
   </div>
 </div>
-*/}
+
           
           <div className="flex items-center justify-between mt-2">
             <span className="text-purple-300">Total Cost:</span>
